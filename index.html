@@ -1,0 +1,3158 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+
+<title>TransportLog — Gestão de CTe</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;background:#f5f5f3;color:#1a1a18}
+:root{
+  --bg:#fff;--bg2:#f5f5f3;--bg3:#eeecea;
+  --text:#1a1a18;--text2:#73726c;--text3:#a0a09a;
+  --border:#e0dfd8;--border2:#c8c7c0;
+  --blue:#185FA5;--blue-l:#E6F1FB;--blue-d:#0C447C;
+  --green:#1D9E75;--green-l:#EAF3DE;
+  --red:#D85A30;--red-l:#FAECE7;
+  --amber:#854F0B;--amber-l:#FAEEDA;
+  --purple:#534AB7;
+  --r:8px;--rl:12px;
+}
+/* ===== LAYOUT ===== */
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:220px;min-width:220px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .2s}
+.sb-logo{padding:18px 16px;border-bottom:1px solid var(--border)}
+.sb-logo-title{font-size:15px;font-weight:700;color:var(--text)}
+.sb-logo-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.nav-sec{padding:14px 12px 4px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:1px 6px;border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--text2);transition:all .15s;user-select:none}
+.nav-item:hover{background:var(--bg2);color:var(--text)}
+.nav-item.active{background:var(--blue-l);color:var(--blue);font-weight:600}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.main{flex:1;overflow:auto;background:var(--bg2);display:flex;flex-direction:column}
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:11px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.topbar-title{font-size:15px;font-weight:700}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.user-badge{font-size:12px;color:var(--text2);background:var(--bg2);padding:5px 10px;border-radius:var(--r);border:1px solid var(--border)}
+.content{padding:20px 24px;flex:1}
+.page{display:none}
+.page.active{display:block}
+/* ===== COMPONENTS ===== */
+.btn{padding:7px 14px;border-radius:var(--r);font-size:13px;cursor:pointer;border:1px solid var(--border2);background:#fff;color:var(--text);font-weight:500;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--bg2)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover{background:var(--blue-d)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-danger{background:var(--red-l);color:var(--red);border-color:var(--red)}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.metric-card{background:#fff;border-radius:var(--r);padding:14px 16px;border:1px solid var(--border)}
+.metric-label{font-size:11px;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.metric-value{font-size:22px;font-weight:700;color:var(--text)}
+.metric-sub{font-size:11px;margin-top:4px;color:var(--text2)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.chart-card{background:#fff;border:1px solid var(--border);border-radius:var(--rl);padding:16px}
+.chart-card.full{grid-column:1/-1}
+.chart-title{font-size:13px;font-weight:600;margin-bottom:12px}
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;margin-bottom:14px}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:500px}
+th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--bg2);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg2)}
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;white-space:nowrap}
+.bg{background:var(--green-l);color:#3B6D11}
+.ba{background:var(--amber-l);color:var(--amber)}
+.br{background:var(--red-l);color:#993C1D}
+.bb{background:var(--blue-l);color:var(--blue)}
+.tabs{display:flex;gap:2px;background:var(--bg3);padding:3px;border-radius:var(--r);margin-bottom:16px;width:fit-content}
+.tab{padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text2);transition:all .15s}
+.tab.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-bar select,.filter-bar input[type=date]{padding:6px 10px;border-radius:var(--r);border:1px solid var(--border2);background:#fff;color:var(--text);font-size:12px}
+.alert{border-radius:var(--r);padding:10px 14px;font-size:12px;margin-bottom:14px;font-weight:500;border:1px solid}
+.alert-info{background:var(--blue-l);color:var(--blue);border-color:#B5D4F4}
+.alert-success{background:var(--green-l);color:#3B6D11;border-color:#C0DD97}
+.alert-error{background:var(--red-l);color:#993C1D;border-color:#F0997B}
+.legend-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:11px;color:var(--text2)}
+.ldot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+/* ===== UPLOAD ===== */
+.upload-area{border:2px dashed var(--border2);border-radius:var(--rl);padding:48px 24px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;margin-bottom:14px}
+.upload-area:hover,.upload-area.drag{border-color:var(--blue);background:var(--blue-l)}
+.upload-icon{font-size:40px;margin-bottom:12px}
+.upload-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.upload-sub{font-size:12px;color:var(--text2)}
+.progress-bar{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:12px}
+.progress-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .2s}
+/* ===== CUSTOS ===== */
+.cost-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cost-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.cost-row:last-of-type{border-bottom:none}
+.cost-input{width:110px;padding:6px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg2);color:var(--text);font-size:12px;text-align:right}
+/* ===== AUTH ===== */
+.auth-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#E6F1FB 0%,#f5f5f3 60%)}
+.auth-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:40px;width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.auth-logo{font-size:22px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.auth-sub{font-size:13px;color:var(--text2);margin-bottom:24px}
+.auth-tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.auth-tab{padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text2);border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
+.auth-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.form-group{margin-bottom:12px}
+.form-label{font-size:12px;font-weight:600;margin-bottom:5px;display:block;color:var(--text2)}
+.form-input{width:100%;padding:10px 12px;border-radius:var(--r);border:1px solid var(--border2);background:#fff;color:var(--text);font-size:13px;transition:border .15s}
+.form-input:focus{outline:none;border-color:var(--blue)}
+/* ===== TOAST ===== */
+#toast{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:10px 20px;border-radius:var(--r);font-size:13px;font-weight:500;z-index:9999;white-space:nowrap}
+/* ===== LOADING ===== */
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;z-index:999;font-size:14px;font-weight:500;gap:10px}
+.filter-sel{width:100%;padding:7px 10px;border-radius:var(--r);border:1px solid var(--border2);background:#fff;color:var(--text);font-size:12px;cursor:pointer}
+.filter-sel:focus{outline:none;border-color:var(--blue)}
+/* ===== RESPONSIVE ===== */
+@media(max-width:900px){
+  .metrics-grid{grid-template-columns:1fr 1fr}
+  .charts-grid{grid-template-columns:1fr}
+  .chart-card.full{grid-column:1}
+  .cost-grid{grid-template-columns:1fr}
+  .sidebar{width:56px;min-width:56px}
+  .sb-logo-sub,.nav-sec,.nav-item span{display:none}
+  .nav-item{justify-content:center;padding:10px}
+}
+@media(max-width:600px){
+  .metrics-grid{grid-template-columns:1fr}
+  .content{padding:12px}
+  .topbar{padding:10px 14px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="spinner"></div> Carregando...
+</div>
+
+<!-- AUTH -->
+<div id="authScreen" style="display:none">
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">🚛 TransportLog</div>
+      <div class="auth-sub">Gestão inteligente de CTe</div>
+      <div class="auth-tabs">
+        <div class="auth-tab active" onclick="authTab('login',this)">Entrar</div>
+        <div class="auth-tab" onclick="authTab('register',this)">Criar conta</div>
+      </div>
+      <div id="authMsg"></div>
+
+      <!-- LOGIN -->
+      <div id="formLogin">
+        <div class="form-group"><label class="form-label">E-mail</label><input class="form-input" type="email" id="loginEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <label class="form-label" style="margin-bottom:0">Senha</label>
+            <span onclick="showForgot()" style="font-size:12px;color:var(--blue);cursor:pointer;font-weight:500">Esqueci minha senha</span>
+          </div>
+          <input class="form-input" type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary" id="btnLogin" style="width:100%;padding:11px;margin-top:8px;font-size:14px" onclick="doLogin()">Entrar</button>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="formRegister" style="display:none">
+        <div class="form-group"><label class="form-label">Nome</label><input class="form-input" type="text" id="regNome" placeholder="Seu nome"></div>
+        <div class="form-group"><label class="form-label">Empresa / Transportadora</label><input class="form-input" type="text" id="regEmpresa" placeholder="Nome da empresa"></div>
+        <div class="form-group"><label class="form-label">E-mail</label><input class="form-input" type="email" id="regEmail" placeholder="seu@email.com"></div>
+        <div class="form-group"><label class="form-label">Senha</label><input class="form-input" type="password" id="regPass" placeholder="Mínimo 8 caracteres, letras e números"></div>
+        <button class="btn btn-primary" id="btnRegister" style="width:100%;padding:11px;margin-top:8px;font-size:14px" onclick="doRegister()">Criar conta grátis</button>
+      </div>
+
+      <!-- ESQUECI MINHA SENHA -->
+      <div id="formForgot" style="display:none">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">
+          Digite seu e-mail cadastrado. Enviaremos um link para você criar uma nova senha.
+        </p>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input class="form-input" type="email" id="forgotEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')doForgotPassword()">
+        </div>
+        <button class="btn btn-primary" id="btnForgot" style="width:100%;padding:11px;margin-top:8px;font-size:14px" onclick="doForgotPassword()">Enviar link de recuperação</button>
+        <button onclick="showLogin()" style="width:100%;margin-top:10px;padding:8px;background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer">← Voltar para o login</button>
+      </div>
+
+      <!-- CONFIRMAÇÃO DE E-MAIL ENVIADO -->
+      <div id="formForgotSent" style="display:none;text-align:center;padding:8px 0">
+        <div style="font-size:40px;margin-bottom:16px">📧</div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:8px">E-mail enviado!</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px">
+          Verifique sua caixa de entrada em <strong id="forgotEmailSent"></strong> e clique no link para criar uma nova senha.<br><br>
+          Não encontrou? Verifique a pasta de spam.
+        </p>
+        <button onclick="showLogin()" class="btn btn-primary" style="width:100%;padding:10px">← Voltar para o login</button>
+      </div>
+
+      <!-- REDEFINIR SENHA (aparece quando usuário clica no link do e-mail) -->
+      <div id="formResetPassword" style="display:none">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">
+          Crie uma nova senha para sua conta.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Nova senha</label>
+          <input class="form-input" type="password" id="newPass" placeholder="Mínimo 8 caracteres" oninput="checkPasswordStrength(this.value)">
+          <!-- Indicador de força -->
+          <div id="passStrengthBar" style="height:4px;border-radius:2px;margin-top:6px;background:var(--border);overflow:hidden">
+            <div id="passStrengthFill" style="height:100%;width:0%;border-radius:2px;transition:all .3s"></div>
+          </div>
+          <div id="passStrengthLabel" style="font-size:11px;margin-top:4px;color:var(--text2)"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar nova senha</label>
+          <input class="form-input" type="password" id="confirmPass" placeholder="Repita a senha" onkeydown="if(event.key==='Enter')doResetPassword()">
+        </div>
+        <div id="resetMsg"></div>
+        <button class="btn btn-primary" id="btnReset" style="width:100%;padding:11px;margin-top:8px;font-size:14px" onclick="doResetPassword()">Salvar nova senha</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen" class="app" style="display:none">
+  <div class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-title">🚛 TransportLog</div>
+      <div class="sb-logo-sub">CTe Intelligence</div>
+    </div>
+    <div class="nav-sec">Principal</div>
+    <div class="nav-item active" onclick="nav('dashboard',this)">
+      <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+      <span>Dashboard</span>
+    </div>
+    <div class="nav-item" onclick="nav('import',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M2 12v1.5A1.5 1.5 0 003.5 15h9a1.5 1.5 0 001.5-1.5V12"/></svg>
+      <span>Importar CTe</span>
+    </div>
+    <div class="nav-sec">Análise</div>
+    <div class="nav-item" onclick="nav('financeiro',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,12 5,8 8,10 12,5 15,7"/></svg>
+      <span>Financeiro</span>
+    </div>
+    <div class="nav-item" onclick="nav('rotas',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="12" r="2"/><path d="M6 4h4a2 2 0 012 2v2"/></svg>
+      <span>Rotas</span>
+    </div>
+    <div class="nav-sec">Operacional</div>
+    <div class="nav-item" onclick="nav('frota',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="6" width="10" height="7" rx="1"/><path d="M11 9h2l2 2v2h-4V9z"/><circle cx="4" cy="13" r="1.2"/><circle cx="13" cy="13" r="1.2"/></svg>
+      <span>Frota</span>
+    </div>
+    <div class="nav-sec">Config</div>
+    <div class="nav-item" onclick="nav('custos',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4"/></svg>
+      <span>Custos</span>
+    </div>
+    <div class="nav-item" onclick="nav('relatorios',this)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      <span>Relatórios</span>
+    </div>
+    <div style="flex:1"></div>
+    <div class="nav-item" style="color:var(--red);margin-bottom:10px" onclick="doLogout()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 3l4 5-4 5M14 8H6M6 2H2.5A1.5 1.5 0 001 3.5v9A1.5 1.5 0 002.5 14H6"/></svg>
+      <span>Sair</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="pageTitle">Dashboard</div>
+      <div class="topbar-right">
+        <div class="user-badge" id="userBadge">—</div>
+        <button class="btn btn-sm" id="btnFiltros" onclick="toggleFiltros()" style="display:flex;align-items:center;gap:6px;font-weight:500">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 3h14M4 8h8M7 13h2"/></svg>
+          Filtros
+          <span id="filtrosBadge" style="display:none;background:var(--blue);color:#fff;border-radius:100px;font-size:10px;padding:1px 6px;font-weight:700">0</span>
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="nav('import',null)">+ Importar</button>
+      </div>
+    </div>
+
+    <!-- PAINEL DE FILTROS (dropdown) -->
+    <div id="filtrosPanel" style="display:none;background:#fff;border-bottom:1px solid var(--border);padding:14px 24px;z-index:9">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:12px">
+
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Período</div>
+          <select class="filter-sel" id="globalPeriod" onchange="applyGlobalFilters()">
+            <option value="9999" selected>Todos os períodos</option>
+            <option value="30">Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+            <option value="365">Último ano</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Ano</div>
+          <select class="filter-sel" id="globalAno" onchange="applyGlobalFilters()">
+            <option value="">Todos os anos</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Mês</div>
+          <select class="filter-sel" id="globalMes" onchange="applyGlobalFilters()">
+            <option value="">Todos os meses</option>
+            <option value="01">Janeiro</option>
+            <option value="02">Fevereiro</option>
+            <option value="03">Março</option>
+            <option value="04">Abril</option>
+            <option value="05">Maio</option>
+            <option value="06">Junho</option>
+            <option value="07">Julho</option>
+            <option value="08">Agosto</option>
+            <option value="09">Setembro</option>
+            <option value="10">Outubro</option>
+            <option value="11">Novembro</option>
+            <option value="12">Dezembro</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Transportadora</div>
+          <select class="filter-sel" id="globalCNPJ" onchange="applyGlobalFilters()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Tomador</div>
+          <select class="filter-sel" id="globalCNPJTomador" onchange="applyGlobalFilters()">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px">Cliente final</div>
+          <select class="filter-sel" id="globalCNPJDest" onchange="applyGlobalFilters()">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:10px">
+        <span id="filtrosAtivosInfo" style="font-size:12px;color:var(--text2)">Nenhum filtro ativo</span>
+        <button class="btn btn-sm" onclick="limparFiltros()" style="color:var(--red);border-color:var(--red)">✕ Limpar todos</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+
+        <!-- 4 métricas -->
+        <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">
+          <div class="metric-card">
+            <div class="metric-label">Receita Total</div>
+            <div class="metric-value" id="m-receita">—</div>
+            <div class="metric-sub" id="m-receita-sub"> </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Lucro c/ impostos</div>
+            <div class="metric-value" id="m-lucro">—</div>
+            <div class="metric-sub pos" id="m-lucro-sub"> </div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Margem Real</div>
+            <div class="metric-value" id="m-margem">—</div>
+            <div class="metric-sub" style="color:var(--text2)">descontando ICMS</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Total de CTe</div>
+            <div class="metric-value" id="m-cte">0</div>
+            <div class="metric-sub" style="color:var(--text2)">documentos</div>
+          </div>
+        </div>
+
+        <!-- Gráfico principal único -->
+        <div class="chart-card full" style="margin-bottom:0">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <div>
+              <div class="chart-title" style="margin-bottom:4px">Receita por mês por UF destino + Margem Real</div>
+              <div style="font-size:11px;color:var(--text2)">Barras = receita empilhada por UF · Linha = margem real do período (%)</div>
+            </div>
+            <div id="dashLegendaUF" style="display:flex;flex-wrap:wrap;gap:8px;max-width:600px"></div>
+          </div>
+          <div style="position:relative;height:380px">
+            <canvas id="chartDashMain"></canvas>
+          </div>
+        </div>
+
+        <!-- ids ocultos para manter compatibilidade -->
+        <span id="m-icms" style="display:none"></span>
+        <span id="m-icms-pct" style="display:none"></span>
+        <canvas id="chartPeriodo" style="display:none"></canvas>
+        <canvas id="chartUF" style="display:none"></canvas>
+        <canvas id="chartRotasDash" style="display:none"></canvas>
+      </div>
+
+      <!-- IMPORTAR -->
+      <div class="page" id="page-import">
+        <div class="upload-area" id="uploadArea"
+          onclick="document.getElementById('fileInput').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="handleDrop(event)">
+          <input type="file" id="fileInput" multiple accept=".xml" style="display:none" onchange="handleFiles(this.files)">
+          <div class="upload-icon">📂</div>
+          <div class="upload-title">Arraste arquivos XML de CTe aqui</div>
+          <div class="upload-sub">ou clique para selecionar — múltiplos arquivos suportados</div>
+          <div id="uploadProgress" style="display:none;margin-top:16px">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="uploadStatus">Processando...</div>
+            <div class="progress-bar"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div id="uploadMsg"></div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span class="card-title" style="margin-bottom:0">CTe importados</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size:12px;color:var(--text2)" id="cteCount">0 registros</span>
+              <button class="btn btn-sm btn-danger" onclick="confirmDeleteAll()">Apagar todos</button>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Nº CTe</th><th>CNPJ Emitente</th><th>Emissão</th><th>Remetente</th><th>Origem</th><th>Destino</th><th>UF</th><th>Frete</th><th>Ação</th></tr></thead>
+              <tbody id="cteTable"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Nenhum CTe importado</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- FINANCEIRO -->
+      <div class="page" id="page-financeiro" style="width:100%;min-height:calc(100vh - 120px)">
+        <div class="tabs">
+          <div class="tab active" onclick="finTab('geral',this)">Visão Geral</div>
+          <div class="tab" onclick="finTab('cte',this)">Por CTe</div>
+          <div class="tab" onclick="finTab('cidade',this)">Por Cidade</div>
+          <div class="tab" onclick="finTab('uf',this)">Por UF</div>
+          <div class="tab" onclick="finTab('impostos',this)">Impostos</div>
+          <div class="tab" onclick="finTab('contas',this)">Contas a Receber</div>
+          <div class="tab" onclick="finTab('pagar',this)">Contas a Pagar</div>
+        </div>
+        <div id="finGeral">
+          <div class="metrics-grid" style="grid-template-columns:repeat(3,1fr)">
+            <div class="metric-card"><div class="metric-label">Receita Total</div><div class="metric-value" id="f-receita">—</div></div>
+            <div class="metric-card"><div class="metric-label">Custos Operacionais</div><div class="metric-value" id="f-custos">—</div></div>
+            <div class="metric-card"><div class="metric-label">ICMS Total</div><div class="metric-value neg" id="f-icms">—</div><div class="metric-sub" id="f-icms-pct"></div></div>
+          </div>
+          <div class="metrics-grid" style="grid-template-columns:repeat(3,1fr)">
+            <div class="metric-card"><div class="metric-label">Lucro s/ impostos</div><div class="metric-value" id="f-lucro-sem">—</div></div>
+            <div class="metric-card"><div class="metric-label">Lucro c/ impostos</div><div class="metric-value" id="f-lucro">—</div></div>
+            <div class="metric-card"><div class="metric-label">Margem real</div><div class="metric-value" id="f-margem">—</div><div class="metric-sub">descontando ICMS</div></div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-card"><div class="chart-title">Receita vs Custo vs Lucro</div><div style="position:relative;height:220px"><canvas id="chartFinComp"></canvas></div></div>
+            <div class="chart-card"><div class="chart-title">Margem % por mês</div><div style="position:relative;height:220px"><canvas id="chartMargem"></canvas></div></div>
+          </div>
+        </div>
+        <div id="finCTE" style="display:none">
+          <div class="filter-bar">
+            <input type="date" id="filtDtIni">
+            <span style="color:var(--text2);font-size:12px">até</span>
+            <input type="date" id="filtDtFim">
+            <select id="filtUF"><option value="">Todas UFs</option></select>
+            <button class="btn btn-primary btn-sm" onclick="renderFinCTE()">Filtrar</button>
+          </div>
+          <div class="card"><div class="tbl-wrap"><table><thead><tr><th>CTe</th><th>UF Ori.</th><th>UF Dest.</th><th>Alíq. ICMS</th><th>ICMS (R$)</th><th>Data</th><th>Receita</th><th>Custo est.</th><th>Lucro s/ imp.</th><th>Lucro c/ imp.</th><th>Margem</th></tr></thead><tbody id="finCTETable"></tbody></table></div></div>
+        </div>
+        <div id="finCidade" style="display:none">
+          <div class="card"><div class="tbl-wrap"><table><thead><tr><th>Cidade destino</th><th>UF</th><th>CTe</th><th>Receita</th><th>Custo</th><th>Lucro</th><th>Margem</th></tr></thead><tbody id="finCidadeTable"></tbody></table></div></div>
+        </div>
+        <div id="finUF" style="display:none">
+          <div class="card"><div class="tbl-wrap"><table><thead><tr><th>UF</th><th>CTe</th><th>Receita</th><th>Custo</th><th>Lucro</th><th>Margem</th></tr></thead><tbody id="finUFTable"></tbody></table></div></div>
+        </div>
+
+        <!-- IMPOSTOS -->
+        <div id="finImpostos" style="display:none">
+          <div class="alert alert-info">
+            💡 Os valores de ICMS e ISS são extraídos diretamente dos XMLs dos CTe. O ISS é aplicável quando o serviço é tributado pelo município (modal urbano). Para CTe rodoviário interestadual o tributo padrão é ICMS.
+          </div>
+          <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+            <div class="metric-card"><div class="metric-label">Total ICMS</div><div class="metric-value neg" id="imp-icms">—</div><div class="metric-sub" id="imp-icms-pct"></div></div>
+            <div class="metric-card"><div class="metric-label">Total ISS</div><div class="metric-value neg" id="imp-iss">—</div><div class="metric-sub" id="imp-iss-pct"></div></div>
+            <div class="metric-card"><div class="metric-label">Total impostos</div><div class="metric-value neg" id="imp-total">—</div><div class="metric-sub" id="imp-total-pct">% da receita</div></div>
+            <div class="metric-card"><div class="metric-label">CTe com imposto</div><div class="metric-value" id="imp-ctes">—</div><div class="metric-sub">documentos</div></div>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-title">Composição dos impostos</div>
+              <div style="position:relative;height:220px"><canvas id="chartImpComp"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">Imposto por UF destino</div>
+              <div style="position:relative;height:220px"><canvas id="chartImpUF"></canvas></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Detalhamento por CTe</div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>CTe</th><th>CNPJ Emit.</th><th>Rota</th><th>Receita</th><th>ICMS</th><th>% ICMS</th><th>ISS</th><th>% ISS</th><th>Total imp.</th></tr></thead>
+                <tbody id="impTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTAS A RECEBER -->
+        <div id="finContas" style="display:none;width:100%">
+
+          <!-- Métricas -->
+          <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+            <div class="metric-card"><div class="metric-label">Total a receber</div><div class="metric-value" id="cr-total">—</div></div>
+            <div class="metric-card"><div class="metric-label">Vence em 7 dias</div><div class="metric-value neg" id="cr-7dias">—</div></div>
+            <div class="metric-card"><div class="metric-label">Vence em 30 dias</div><div class="metric-value" style="color:var(--amber)" id="cr-30dias">—</div></div>
+            <div class="metric-card"><div class="metric-label">Vencidos</div><div class="metric-value neg" id="cr-vencidos">—</div></div>
+          </div>
+
+          <!-- Prazos cadastrados -->
+          <div class="card" style="margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <span style="font-size:13px;font-weight:600">Prazos por cliente</span>
+              <span style="font-size:11px;color:var(--text2)">Configure o prazo de cada tomador para calcular os vencimentos</span>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Cliente (tomador)</th><th>CNPJ</th><th>Prazo</th><th>Observação</th><th>Ação</th></tr></thead>
+                <tbody id="prazosTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Filtros da lista -->
+          <div class="filter-bar" style="margin-bottom:12px">
+            <select id="crFiltStatus" onchange="renderContasReceber()" style="padding:6px 10px;border-radius:var(--r);border:1px solid var(--border2);font-size:12px">
+              <option value="">Todos os status</option>
+              <option value="vencido">Vencidos</option>
+              <option value="urgente">Vencem em 7 dias</option>
+              <option value="proximo">Vencem em 30 dias</option>
+              <option value="ok">Em dia</option>
+              <option value="sem_prazo">Sem prazo</option>
+            </select>
+            <select id="crFiltCliente" onchange="renderContasReceber()" style="padding:6px 10px;border-radius:var(--r);border:1px solid var(--border2);font-size:12px">
+              <option value="">Todos os clientes</option>
+            </select>
+            <button class="btn btn-sm btn-primary" onclick="exportContasCSV()">⬇️ Exportar CSV</button>
+          </div>
+
+          <!-- Tabela principal -->
+          <div class="card">
+            <div class="tbl-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nº CTe</th>
+                    <th>Emissão</th>
+                    <th>Tomador (quem paga)</th>
+                    <th>Cliente final (destinatário)</th>
+                    <th>Rota</th>
+                    <th>Valor CTe</th>
+                    <th>Prazo</th>
+                    <th>Vencimento</th>
+                    <th>Situação</th>
+                    <th>Dias</th>
+                  </tr>
+                </thead>
+                <tbody id="contasTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- CONTAS A PAGAR -->
+        <div id="finPagar" style="display:none;width:100%">
+
+          <!-- Métricas topo -->
+          <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+            <div class="metric-card"><div class="metric-label">Total despesas</div><div class="metric-value neg" id="cp-total">—</div></div>
+            <div class="metric-card"><div class="metric-label">Custo por viagem</div><div class="metric-value" id="cp-viagem">—</div></div>
+            <div class="metric-card"><div class="metric-label">Custo de veículos</div><div class="metric-value" id="cp-veiculo">—</div></div>
+            <div class="metric-card"><div class="metric-label">Ocorrências</div><div class="metric-value" id="cp-ocorr">—</div></div>
+          </div>
+
+          <!-- Seção viagens -->
+          <div class="card" style="margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div>
+                <div style="font-size:13px;font-weight:700">Custos por viagem (CTe)</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:2px">Custo estimado de cada CTe + ocorrências registradas</div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <select id="cpFiltMes" onchange="renderContasPagar()" style="padding:5px 8px;border-radius:var(--r);border:1px solid var(--border2);font-size:12px">
+                  <option value="">Todos os meses</option>
+                </select>
+              </div>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nº CTe</th>
+                    <th>Data</th>
+                    <th>Placa</th>
+                    <th>UF Saída</th>
+                    <th>UF Destino</th>
+                    <th>Receita</th>
+                    <th>Custo est.</th>
+                    <th>Ocorrências</th>
+                    <th>Custo total</th>
+                    <th>Resultado</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="cpViagemTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Seção veículos -->
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div>
+                <div style="font-size:13px;font-weight:700">Custos de veículos</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:2px">Manutenção, vistoria, pneus, seguro e outros gastos fixos</div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openCustoVeiculoModal()">+ Registrar custo de veículo</button>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Placa</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Data</th><th>Mês ref.</th><th>Ação</th></tr></thead>
+                <tbody id="cpVeiculoTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ROTAS -->
+      <div class="page" id="page-rotas">
+        <div class="charts-grid">
+          <div class="chart-card"><div class="chart-title">🏆 Top 5 mais lucrativas</div><div style="position:relative;height:240px"><canvas id="chartTopLucro"></canvas></div></div>
+          <div class="chart-card"><div class="chart-title">⚠️ Top 5 menos lucrativas</div><div style="position:relative;height:240px"><canvas id="chartBottomLucro"></canvas></div></div>
+        </div>
+        <div class="card"><div class="card-title">Análise completa por rota</div>
+          <div class="tbl-wrap"><table><thead><tr><th>Rota</th><th>CTe</th><th>KM est.</th><th>Receita</th><th>Custo</th><th>Lucro</th><th>Margem</th><th>Status</th></tr></thead><tbody id="rotasTable"></tbody></table></div>
+        </div>
+      </div>
+
+      <!-- CUSTOS -->
+      <div class="page" id="page-custos">
+        <div class="alert alert-info">💡 Os parâmetros abaixo são usados para estimar os custos de cada CTe. Altere e salve para recalcular tudo automaticamente.</div>
+        <div class="cost-grid">
+          <div class="card">
+            <div class="card-title">⚙️ Parâmetros de custo</div>
+            <div class="cost-row"><span>Custo por KM (R$)</span><input class="cost-input" type="number" id="custKm" value="0.85" step="0.05"></div>
+            <div class="cost-row"><span>Pedágio médio por rota (R$)</span><input class="cost-input" type="number" id="custPedagio" value="45"></div>
+            <div class="cost-row"><span>Custo fixo por CTe (R$)</span><input class="cost-input" type="number" id="custFixo" value="80"></div>
+            <div class="cost-row"><span>Taxa administrativa (%)</span><input class="cost-input" type="number" id="custAdm" value="3.5" step="0.5"></div>
+            <div class="cost-row"><span>Seguro da carga (%)</span><input class="cost-input" type="number" id="custSeguro" value="0.8" step="0.1"></div>
+            <button class="btn btn-primary" style="width:100%;margin-top:16px;padding:10px" onclick="saveCosts()">💾 Salvar parâmetros</button>
+          </div>
+          <div class="card">
+            <div class="card-title">📊 Impacto atual</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+              <div class="metric-card"><div class="metric-label">Custo médio/CTe</div><div class="metric-value" id="c-medio" style="font-size:18px">—</div></div>
+              <div class="metric-card"><div class="metric-label">Custo total</div><div class="metric-value" id="c-total" style="font-size:18px">—</div></div>
+            </div>
+            <div class="chart-title">Composição dos custos</div>
+            <div style="position:relative;height:200px"><canvas id="chartCustoComp"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RELATÓRIOS -->
+      <div class="page" id="page-relatorios">
+        <div class="alert alert-info">📄 Exporte os dados dos seus CTe para análise externa</div>
+        <div class="cost-grid">
+          <div class="card">
+            <div class="card-title">⚙️ Configurar exportação</div>
+            <div class="cost-row"><span>Período</span>
+              <select style="padding:6px 10px;border-radius:var(--r);border:1px solid var(--border2);font-size:12px" id="repPeriodo">
+                <option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option><option value="365">Este ano</option><option value="9999">Todos</option>
+              </select>
+            </div>
+            <div class="cost-row"><span>Agrupar por</span>
+              <select style="padding:6px 10px;border-radius:var(--r);border:1px solid var(--border2);font-size:12px" id="repAgrup">
+                <option value="cte">CTe individual</option><option value="rota">Rota</option><option value="cidade">Cidade</option><option value="uf">UF</option>
+              </select>
+            </div>
+            <div class="cost-row"><span>Colunas</span><span style="font-size:11px;color:var(--text2)">Receita, Custo, Lucro, Margem</span></div>
+            <div style="display:flex;gap:10px;margin-top:16px">
+              <button class="btn btn-primary" style="flex:1" onclick="exportCSV()">⬇️ CSV</button>
+              <button class="btn" style="flex:1" onclick="exportExcel()">⬇️ Excel</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">👁️ Prévia</div>
+            <div class="tbl-wrap"><table style="min-width:auto"><thead><tr><th>CTe</th><th>Rota</th><th>Receita</th><th>Lucro</th><th>Margem</th></tr></thead><tbody id="prevTable"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FROTA -->
+      <div class="page" id="page-frota">
+
+        <!-- MODAL -->
+        <div id="frotaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:999;display:none;align-items:center;justify-content:center">
+          <div style="background:#fff;border-radius:var(--rl);padding:24px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+              <span style="font-size:15px;font-weight:700" id="modalFrotaTitle">Cadastrar veículo</span>
+              <button onclick="closeFrotaModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2)">✕</button>
+            </div>
+            <input type="hidden" id="frotaEditId">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">Tipo de veículo</label>
+                <select class="form-input" id="frotaTipo" onchange="toggleCarreta()">
+                  <option value="truck">Caminhão simples</option>
+                  <option value="carreta">Carreta (cavalo + carreta)</option>
+                  <option value="toco">Toco</option>
+                  <option value="bitruck">Bitruck</option>
+                  <option value="van">Van / Utilitário</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Placa do cavalo / veículo</label>
+                <input class="form-input" type="text" id="frotaPlacaCavalo" placeholder="ABC-1234" maxlength="8" oninput="this.value=this.value.toUpperCase()">
+              </div>
+              <div class="form-group" id="grupoPlacaCarreta">
+                <label class="form-label">Placa da carreta</label>
+                <input class="form-input" type="text" id="frotaPlacaCarreta" placeholder="DEF-5678" maxlength="8" oninput="this.value=this.value.toUpperCase()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Modelo</label>
+                <input class="form-input" type="text" id="frotaModelo" placeholder="Ex: Scania R450">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Ano</label>
+                <input class="form-input" type="number" id="frotaAno" placeholder="2020" min="1990" max="2030">
+              </div>
+              <div class="form-group">
+                <label class="form-label">KM atual</label>
+                <input class="form-input" type="number" id="frotaKmAtual" placeholder="150000">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Status</label>
+                <select class="form-input" id="frotaStatus">
+                  <option value="ativo">Ativo</option>
+                  <option value="manutencao">Em manutenção</option>
+                  <option value="inativo">Inativo</option>
+                </select>
+              </div>
+            </div>
+            <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px">
+              <div style="font-size:13px;font-weight:700;margin-bottom:12px">Manutenções</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="form-group"><label class="form-label">Última troca de óleo</label><input class="form-input" type="date" id="frotaUltimoOleo"></div>
+                <div class="form-group"><label class="form-label">KM na troca de óleo</label><input class="form-input" type="number" id="frotaKmOleo" placeholder="140000"></div>
+                <div class="form-group"><label class="form-label">Última revisão</label><input class="form-input" type="date" id="frotaUltimaRevisao"></div>
+                <div class="form-group"><label class="form-label">Próxima revisão</label><input class="form-input" type="date" id="frotaProximaRevisao"></div>
+                <div class="form-group"><label class="form-label">Troca de pneus</label><input class="form-input" type="date" id="frotaTrocaPneu"></div>
+                <div class="form-group"><label class="form-label">KM na troca de pneus</label><input class="form-input" type="number" id="frotaKmPneu" placeholder="130000"></div>
+                <div class="form-group"><label class="form-label">Vencimento do licenciamento</label><input class="form-input" type="date" id="frotaLicenciamento"></div>
+                <div class="form-group"><label class="form-label">Vencimento do seguro</label><input class="form-input" type="date" id="frotaSeguro"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Observações</label>
+              <textarea class="form-input" id="frotaObs" rows="3" placeholder="Anotações sobre o veículo..." style="resize:vertical"></textarea>
+            </div>
+            <div id="frotaModalMsg"></div>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <button class="btn" style="flex:1" onclick="closeFrotaModal()">Cancelar</button>
+              <button class="btn btn-primary" style="flex:1" id="btnSalvarFrota" onclick="salvarFrota()">Salvar veículo</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div>
+            <div style="font-size:15px;font-weight:700">Gerenciamento de Frota</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">Controle veículos, manutenções e documentos</div>
+          </div>
+          <button class="btn btn-primary" onclick="openFrotaModal()">+ Cadastrar veículo</button>
+        </div>
+
+        <div id="frotaAlertas" style="margin-bottom:12px"></div>
+
+        <div class="metrics-grid" style="margin-bottom:16px">
+          <div class="metric-card"><div class="metric-label">Total veículos</div><div class="metric-value" id="fr-total">0</div></div>
+          <div class="metric-card"><div class="metric-label">Ativos</div><div class="metric-value pos" id="fr-ativos">0</div></div>
+          <div class="metric-card"><div class="metric-label">Em manutenção</div><div class="metric-value" style="color:var(--amber)" id="fr-manutencao">0</div></div>
+          <div class="metric-card"><div class="metric-label">Alertas</div><div class="metric-value neg" id="fr-alertas">0</div></div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active" onclick="frotaTab('lista',this)">Veículos</div>
+          <div class="tab" onclick="frotaTab('manutencao',this)">Manutenções</div>
+          <div class="tab" onclick="frotaTab('documentos',this)">Documentos</div>
+        </div>
+
+        <div id="frotaLista">
+          <div class="card"><div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Placa cavalo</th><th>Placa carreta</th><th>Tipo</th><th>Modelo</th><th>Ano</th><th>KM atual</th><th>Status</th><th>Ações</th></tr></thead>
+              <tbody id="frotaTable"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Nenhum veículo cadastrado</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+
+        <div id="frotaManutencao" style="display:none">
+          <div class="card"><div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Placa</th><th>Modelo</th><th>Último óleo</th><th>KM óleo</th><th>Última revisão</th><th>Próx. revisão</th><th>Pneus</th><th>Situação</th></tr></thead>
+              <tbody id="frotaManutTable"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Nenhum veículo cadastrado</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+
+        <div id="frotaDocumentos" style="display:none">
+          <div class="card"><div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Placa</th><th>Modelo</th><th>Licenciamento</th><th>Situação licenc.</th><th>Seguro</th><th>Situação seguro</th></tr></thead>
+              <tbody id="frotaDocTable"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text3)">Nenhum veículo cadastrado</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Ocorrência por CTe -->
+<div id="ocorrenciaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:var(--rl);padding:24px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div style="font-size:15px;font-weight:700">Ocorrências do CTe</div>
+        <div style="font-size:12px;color:var(--text2)" id="ocorrCteLabel"></div>
+      </div>
+      <button onclick="closeOcorrModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2)">✕</button>
+    </div>
+    <input type="hidden" id="ocorrCteNum">
+
+    <!-- Lista de ocorrências -->
+    <div id="ocorrLista" style="margin-bottom:16px"></div>
+
+    <!-- Formulário nova ocorrência -->
+    <div style="border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--text2)">ADICIONAR OCORRÊNCIA</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <select class="form-input" id="ocorrTipo">
+            <option value="descarga">Descarga extra</option>
+            <option value="diaria">Diária</option>
+            <option value="pedagio_extra">Pedágio extra</option>
+            <option value="avaria">Avaria / Sinistro</option>
+            <option value="estadia">Estadia</option>
+            <option value="outros">Outros</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor (R$)</label>
+          <input class="form-input" type="number" id="ocorrValor" placeholder="0,00" min="0" step="0.01">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Descrição</label>
+          <input class="form-input" type="text" id="ocorrDesc" placeholder="Descreva o que ocorreu">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data</label>
+          <input class="form-input" type="date" id="ocorrData">
+        </div>
+      </div>
+      <div id="ocorrMsg"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px" id="btnSalvarOcorr" onclick="salvarOcorrencia()">+ Adicionar ocorrência</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Custo de Veículo -->
+<div id="custoVeiculoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:var(--rl);padding:24px;width:480px;max-width:95vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <span style="font-size:15px;font-weight:700">Registrar custo de veículo</span>
+      <button onclick="closeCustoVeiculoModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2)">✕</button>
+    </div>
+    <input type="hidden" id="cvEditId">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Placa do veículo</label>
+        <input class="form-input" type="text" id="cvPlaca" placeholder="ABC-1234" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de custo</label>
+        <select class="form-input" id="cvTipo">
+          <option value="manutencao">Manutenção</option>
+          <option value="vistoria">Vistoria</option>
+          <option value="pneu">Pneu</option>
+          <option value="oleo">Troca de óleo</option>
+          <option value="seguro">Seguro</option>
+          <option value="ipva">IPVA / Licenciamento</option>
+          <option value="lavagem">Lavagem</option>
+          <option value="outros">Outros</option>
+        </select>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Descrição</label>
+        <input class="form-input" type="text" id="cvDesc" placeholder="Ex: Troca de 4 pneus dianteiros">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Valor (R$)</label>
+        <input class="form-input" type="number" id="cvValor" placeholder="0,00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data do custo</label>
+        <input class="form-input" type="date" id="cvData">
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label class="form-label">Mês de referência</label>
+        <input class="form-input" type="month" id="cvMesRef">
+      </div>
+    </div>
+    <div id="cvMsg"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn" style="flex:1" onclick="closeCustoVeiculoModal()">Cancelar</button>
+      <button class="btn btn-primary" style="flex:1" id="btnSalvarCV" onclick="salvarCustoVeiculo()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de prazo de pagamento — fora de qualquer div hidden -->
+<div id="prazoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:var(--rl);padding:24px;width:440px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <span style="font-size:15px;font-weight:700">Prazo de pagamento</span>
+      <button onclick="closePrazoModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2)">✕</button>
+    </div>
+    <input type="hidden" id="prazoClienteCNPJ">
+    <div class="form-group">
+      <label class="form-label">Cliente</label>
+      <input class="form-input" type="text" id="prazoClienteNome" readonly style="background:var(--bg2)">
+    </div>
+    <div class="form-group">
+      <label class="form-label">CNPJ</label>
+      <input class="form-input" type="text" id="prazoClienteCNPJDisplay" readonly style="background:var(--bg2)">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prazo de pagamento (dias corridos após emissão)</label>
+      <input class="form-input" type="number" id="prazoDias" min="1" max="365" placeholder="Ex: 30" onkeydown="if(event.key==='Enter')salvarPrazo()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Observação</label>
+      <input class="form-input" type="text" id="prazoObs" placeholder="Ex: Pagamento toda sexta-feira">
+    </div>
+    <div id="prazoModalMsg"></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn" style="flex:1" onclick="closePrazoModal()">Cancelar</button>
+      <button class="btn btn-primary" style="flex:1" id="btnSalvarPrazo" onclick="salvarPrazo()">💾 Salvar prazo</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ===== SUPABASE =====
+const SUPA_URL = 'https://mrnzieinjxobdlvtvvqq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ybnppZWluanhvYmRsdnR2dnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTQ0MzUsImV4cCI6MjA5MTU3MDQzNX0.M3bgMbA1Z9O4zuKgbIqWpKNfYYVyUroMBZSM8B71t1k';
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
+
+let currentUser = null;
+let allCTEs = [];
+let costs = {km:0.85, pedagio:45, fixo:80, adm:3.5, seguro:0.8};
+let charts = {};
+
+// ===== SEGURANÇA: Rate limiting de login =====
+const loginAttempts = { count: 0, lastAttempt: 0, blocked: false };
+const MAX_LOGIN_ATTEMPTS = 5;
+const BLOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutos
+
+function checkRateLimit() {
+  const now = Date.now();
+  if (loginAttempts.blocked) {
+    const remaining = Math.ceil((loginAttempts.lastAttempt + BLOCK_DURATION_MS - now) / 60000);
+    if (now < loginAttempts.lastAttempt + BLOCK_DURATION_MS) {
+      authMsg(`⛔ Muitas tentativas. Tente novamente em ${remaining} minuto(s).`, 'error');
+      return false;
+    }
+    loginAttempts.blocked = false;
+    loginAttempts.count = 0;
+  }
+  return true;
+}
+
+function registerFailedAttempt() {
+  loginAttempts.count++;
+  loginAttempts.lastAttempt = Date.now();
+  if (loginAttempts.count >= MAX_LOGIN_ATTEMPTS) {
+    loginAttempts.blocked = true;
+    authMsg(`⛔ Conta bloqueada temporariamente por ${BLOCK_DURATION_MS/60000} minutos por excesso de tentativas.`, 'error');
+  } else {
+    const remaining = MAX_LOGIN_ATTEMPTS - loginAttempts.count;
+    authMsg(`E-mail ou senha incorretos. ${remaining} tentativa(s) restante(s).`, 'error');
+  }
+}
+
+// ===== SEGURANÇA: Sanitização de inputs =====
+function sanitize(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .slice(0, 500); // limita tamanho
+}
+
+function sanitizeNum(v, min, max, def) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return def;
+  return Math.min(Math.max(n, min), max);
+}
+
+// ===== SEGURANÇA: Timeout de sessão (2h inativo) =====
+const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+let sessionTimer = null;
+function resetSessionTimer() {
+  clearTimeout(sessionTimer);
+  sessionTimer = setTimeout(async () => {
+    toast('⏱️ Sessão expirada por inatividade.');
+    await sb.auth.signOut();
+  }, SESSION_TIMEOUT_MS);
+}
+['click','keydown','mousemove','touchstart'].forEach(ev =>
+  document.addEventListener(ev, resetSessionTimer, { passive: true })
+);
+
+// ===== INIT =====
+async function init() {
+  // Detecta se o usuário chegou pelo link de recuperação de senha
+  // O Supabase envia o token no hash da URL: #access_token=...&type=recovery
+  const hash = window.location.hash;
+  const isRecovery = hash.includes('type=recovery') || hash.includes('type=signup');
+
+  const { data: { session } } = await sb.auth.getSession();
+  hide('loadingOverlay');
+
+  if (isRecovery) {
+    // Mostra tela de redefinir senha
+    show('authScreen');
+    hideAllForms();
+    document.querySelector('.auth-tabs').style.display = 'none';
+    document.getElementById('formResetPassword').style.display = 'block';
+    document.getElementById('authMsg').innerHTML = '';
+    return; // não entra no app ainda
+  }
+
+  if (session) {
+    currentUser = session.user;
+    await startApp();
+  } else {
+    show('authScreen');
+  }
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      // Usuário clicou no link do e-mail — mostra tela de nova senha
+      hide('appScreen');
+      show('authScreen');
+      hideAllForms();
+      document.querySelector('.auth-tabs').style.display = 'none';
+      document.getElementById('formResetPassword').style.display = 'block';
+    } else if (event === 'SIGNED_IN' && session && !document.getElementById('formResetPassword').style.display === 'none') {
+      currentUser = session.user;
+      hide('authScreen');
+      await startApp();
+    } else if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user;
+      hide('authScreen');
+      await startApp();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      allCTEs = [];
+      hide('appScreen');
+      show('authScreen');
+      showLogin();
+    }
+  });
+}
+
+async function startApp() {
+  show('appScreen');
+  hide('authScreen');
+  document.getElementById('userBadge').textContent = currentUser.email;
+  await loadCosts();
+  await loadCTEs();
+  await loadFrota();
+  await loadPrazos();
+  await loadContasPagar();
+  loadDashboard();
+  renderImport();
+  renderCustos();
+  renderPrevia();
+  renderFrota();
+}
+
+// ===== AUTH =====
+function authTab(t, el) {
+  document.querySelectorAll('.auth-tab').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('formLogin').style.display = t === 'login' ? 'block' : 'none';
+  document.getElementById('formRegister').style.display = t === 'register' ? 'block' : 'none';
+  document.getElementById('authMsg').innerHTML = '';
+}
+
+async function doLogin() {
+  if (!checkRateLimit()) return;
+  const email = val('loginEmail'), pass = val('loginPass');
+  if (!email || !pass) return authMsg('Preencha e-mail e senha', 'error');
+  if (!isValidEmail(email)) return authMsg('E-mail inválido', 'error');
+  if (pass.length < 6) return authMsg('Senha muito curta', 'error');
+  setLoading('btnLogin', true, 'Entrando...');
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  setLoading('btnLogin', false, 'Entrar');
+  if (error) {
+    registerFailedAttempt();
+  } else {
+    loginAttempts.count = 0;
+    loginAttempts.blocked = false;
+    resetSessionTimer();
+  }
+}
+
+async function doRegister() {
+  const nome = val('regNome'), empresa = val('regEmpresa');
+  const email = val('regEmail'), pass = val('regPass');
+  if (!nome || !email || !pass) return authMsg('Preencha todos os campos', 'error');
+  if (!isValidEmail(email)) return authMsg('E-mail inválido', 'error');
+  if (pass.length < 8) return authMsg('Senha deve ter ao menos 8 caracteres', 'error');
+  if (!isStrongPassword(pass)) return authMsg('Senha fraca. Use letras, números e ao menos 1 caractere especial.', 'error');
+  if (nome.length > 100 || empresa.length > 100) return authMsg('Nome ou empresa muito longos', 'error');
+  setLoading('btnRegister', true, 'Criando conta...');
+  const { error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { nome: sanitize(nome), empresa: sanitize(empresa) } }
+  });
+  setLoading('btnRegister', false, 'Criar conta grátis');
+  if (error) authMsg(error.message, 'error');
+  else authMsg('✅ Conta criada! Verifique seu e-mail para confirmar.', 'success');
+}
+
+async function doLogout() {
+  clearTimeout(sessionTimer);
+  await sb.auth.signOut();
+}
+
+function authMsg(msg, type) {
+  document.getElementById('authMsg').innerHTML = `<div class="alert alert-${type}" style="margin-bottom:12px">${msg}</div>`;
+}
+
+// ===== RECUPERAÇÃO DE SENHA =====
+function showForgot() {
+  hideAllForms();
+  document.getElementById('formForgot').style.display = 'block';
+  document.getElementById('authMsg').innerHTML = '';
+  // Esconde as abas enquanto está no fluxo de recuperação
+  document.querySelector('.auth-tabs').style.display = 'none';
+  document.getElementById('forgotEmail').value = document.getElementById('loginEmail').value || '';
+  document.getElementById('forgotEmail').focus();
+}
+
+function showLogin() {
+  hideAllForms();
+  document.getElementById('formLogin').style.display = 'block';
+  document.querySelector('.auth-tabs').style.display = 'flex';
+  document.getElementById('authMsg').innerHTML = '';
+  // Reativa aba login
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.auth-tab')[0].classList.add('active');
+}
+
+function hideAllForms() {
+  ['formLogin','formRegister','formForgot','formForgotSent','formResetPassword'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if (!email) return showResetMsg('forgotMsg', 'Informe seu e-mail', 'error');
+  if (!isValidEmail(email)) return showResetMsg('forgotMsg', 'E-mail inválido', 'error');
+
+  setLoading('btnForgot', true, 'Enviando...');
+
+  // Detecta URL base atual para o redirect
+  const redirectTo = window.location.href.split('?')[0].split('#')[0];
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectTo
+  });
+
+  setLoading('btnForgot', false, 'Enviar link de recuperação');
+
+  // Por segurança mostramos sucesso mesmo se o e-mail não existir
+  // (evita enumeração de usuários)
+  hideAllForms();
+  document.getElementById('forgotEmailSent').textContent = email;
+  document.getElementById('formForgotSent').style.display = 'block';
+}
+
+async function doResetPassword() {
+  const newPass = document.getElementById('newPass').value;
+  const confirmPass = document.getElementById('confirmPass').value;
+  const msgEl = document.getElementById('resetMsg');
+  msgEl.innerHTML = '';
+
+  if (!newPass || !confirmPass) {
+    msgEl.innerHTML = '<div class="alert alert-error" style="margin-bottom:8px">Preencha os dois campos</div>';
+    return;
+  }
+  if (newPass.length < 8) {
+    msgEl.innerHTML = '<div class="alert alert-error" style="margin-bottom:8px">Senha deve ter ao menos 8 caracteres</div>';
+    return;
+  }
+  if (!isStrongPassword(newPass)) {
+    msgEl.innerHTML = '<div class="alert alert-error" style="margin-bottom:8px">Senha fraca. Use letras e números.</div>';
+    return;
+  }
+  if (newPass !== confirmPass) {
+    msgEl.innerHTML = '<div class="alert alert-error" style="margin-bottom:8px">As senhas não coincidem</div>';
+    return;
+  }
+
+  setLoading('btnReset', true, 'Salvando...');
+  const { error } = await sb.auth.updateUser({ password: newPass });
+  setLoading('btnReset', false, 'Salvar nova senha');
+
+  if (error) {
+    msgEl.innerHTML = `<div class="alert alert-error" style="margin-bottom:8px">Erro: ${error.message}</div>`;
+  } else {
+    msgEl.innerHTML = '<div class="alert alert-success" style="margin-bottom:8px">✅ Senha alterada com sucesso!</div>';
+    // Redireciona para o app após 2 segundos
+    setTimeout(async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        currentUser = session.user;
+        hide('authScreen');
+        await startApp();
+        // Limpa o token da URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }, 2000);
+  }
+}
+
+function showResetMsg(id, msg, type) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = `<div class="alert alert-${type}" style="margin-bottom:8px">${msg}</div>`;
+}
+
+// Indicador visual de força de senha
+function checkPasswordStrength(pass) {
+  const bar = document.getElementById('passStrengthFill');
+  const label = document.getElementById('passStrengthLabel');
+  if (!bar || !label) return;
+  let score = 0;
+  if (pass.length >= 8) score++;
+  if (pass.length >= 12) score++;
+  if (/[A-Z]/.test(pass)) score++;
+  if (/[0-9]/.test(pass)) score++;
+  if (/[^A-Za-z0-9]/.test(pass)) score++;
+  const levels = [
+    { pct: 0,   color: '#e0dfd8', text: '' },
+    { pct: 20,  color: '#D85A30', text: '🔴 Muito fraca' },
+    { pct: 40,  color: '#D85A30', text: '🟠 Fraca' },
+    { pct: 60,  color: '#854F0B', text: '🟡 Razoável' },
+    { pct: 80,  color: '#1D9E75', text: '🟢 Boa' },
+    { pct: 100, color: '#0F6E56', text: '✅ Forte' },
+  ];
+  const lvl = levels[score] || levels[0];
+  bar.style.width = lvl.pct + '%';
+  bar.style.background = lvl.color;
+  label.textContent = lvl.text;
+  label.style.color = lvl.color;
+}
+
+// ===== NAVIGATION =====
+const pageTitles = {dashboard:'Dashboard',import:'Importar CTe',financeiro:'Análise Financeira',rotas:'Análise de Rotas',custos:'Configurar Custos',relatorios:'Relatórios',frota:'Gerenciamento de Frota'};
+async function nav(p, el) {
+  document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  if (el) el.classList.add('active');
+  document.getElementById('pageTitle').textContent = pageTitles[p] || p;
+
+  // Sempre recarrega dados do banco antes de renderizar
+  // Garante que dados nunca ficam em branco ao trocar de página
+  if (['dashboard','financeiro','rotas','relatorios'].includes(p)) {
+    await loadCTEs();
+  }
+  if (p === 'frota') await loadFrota();
+
+  if (p === 'dashboard') loadDashboard();
+  if (p === 'import') { await loadCTEs(); renderImport(); }
+  if (p === 'financeiro') renderFinanceiro();
+  if (p === 'rotas') renderRotas();
+  if (p === 'custos') renderCustos();
+  if (p === 'relatorios') renderPrevia();
+  if (p === 'frota') renderFrota();
+}
+
+// ===== DATA =====
+async function loadCTEs() {
+  try {
+    const { data, error } = await sb.from('ctes').select('*').eq('user_id', currentUser.id).order('data_emissao', { ascending: false });
+    if (error) {
+      console.warn('Erro ao carregar CTe:', error.message);
+      const { data: data2 } = await sb.from('ctes').select('*').eq('user_id', currentUser.id);
+      if (data2) allCTEs = data2;
+    } else if (data) {
+      allCTEs = data;
+    }
+    updateCNPJFilter();
+    updateAnoFilter();
+  } catch(e) {
+    console.warn('loadCTEs exception:', e);
+  }
+}
+
+async function loadCosts() {
+  const { data } = await sb.from('custos_config').select('*').eq('user_id', currentUser.id).single();
+  if (data) {
+    costs = { km: +data.custo_km, pedagio: +data.pedagio_medio, fixo: +data.custo_fixo, adm: +data.taxa_adm, seguro: +data.seguro };
+    document.getElementById('custKm').value = costs.km;
+    document.getElementById('custPedagio').value = costs.pedagio;
+    document.getElementById('custFixo').value = costs.fixo;
+    document.getElementById('custAdm').value = costs.adm;
+    document.getElementById('custSeguro').value = costs.seguro;
+  }
+}
+
+async function saveCosts() {
+  // SEGURANÇA: valida ranges razoáveis para cada campo
+  costs = {
+    km:      sanitizeNum(document.getElementById('custKm').value,      0.01, 50,   0.85),
+    pedagio: sanitizeNum(document.getElementById('custPedagio').value, 0,    5000, 45),
+    fixo:    sanitizeNum(document.getElementById('custFixo').value,    0,    5000, 80),
+    adm:     sanitizeNum(document.getElementById('custAdm').value,     0,    50,   3.5),
+    seguro:  sanitizeNum(document.getElementById('custSeguro').value,  0,    20,   0.8),
+  };
+  // Atualiza os campos com valores sanitizados
+  document.getElementById('custKm').value      = costs.km;
+  document.getElementById('custPedagio').value = costs.pedagio;
+  document.getElementById('custFixo').value    = costs.fixo;
+  document.getElementById('custAdm').value     = costs.adm;
+  document.getElementById('custSeguro').value  = costs.seguro;
+
+  await sb.from('custos_config').upsert({
+    user_id: currentUser.id,
+    custo_km: costs.km, pedagio_medio: costs.pedagio,
+    custo_fixo: costs.fixo, taxa_adm: costs.adm, seguro: costs.seguro,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id' });
+  renderCustos();
+  loadDashboard();
+  renderFinanceiro();
+  renderRotas();
+  toast('✅ Parâmetros salvos!');
+}
+
+// ===== XML PARSER =====
+function parseCTeXML(xmlStr) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlStr, 'application/xml');
+    const g = (tag) => {
+      const el = doc.getElementsByTagNameNS('*', tag)[0] || doc.querySelector(tag);
+      return el ? el.textContent.trim() : '';
+    };
+    const nCT = g('nCT') || ('CTe-' + Math.random().toString(36).substr(2,6).toUpperCase());
+    const dhEmi = g('dhEmi') || g('dEmi') || new Date().toISOString();
+    const data_emissao = dhEmi.substring(0, 10);
+
+    // Extrai CNPJ do emitente — usado como chave de unicidade
+    const emitEl = doc.getElementsByTagNameNS('*', 'emit')[0];
+    const cnpj_emitente = emitEl
+      ? (emitEl.getElementsByTagNameNS('*','CNPJ')[0]?.textContent?.trim() || emitEl.getElementsByTagNameNS('*','CPF')[0]?.textContent?.trim() || g('CNPJ') || '')
+      : (g('CNPJ') || '');
+    const emitente = emitEl
+      ? (emitEl.getElementsByTagNameNS('*','xNome')[0]?.textContent?.trim() || g('xNome') || 'Não identificado')
+      : (g('xNome') || 'Não identificado');
+
+    const vTPrest = g('vTPrest') || g('vRec') || '0';
+    const valor_frete = parseFloat(vTPrest) || 0;
+
+    // Remetente (tomador de serviço) e Destinatário (cliente final)
+    const rems = doc.getElementsByTagNameNS('*', 'rem');
+    const dests = doc.getElementsByTagNameNS('*', 'dest');
+    const remEl  = rems[0];
+    const destEl = dests[0];
+    const remetente = remEl
+      ? remEl.getElementsByTagNameNS('*','xNome')[0]?.textContent?.trim() || 'Não informado'
+      : 'Não informado';
+    const cnpj_remetente = remEl
+      ? remEl.getElementsByTagNameNS('*','CNPJ')[0]?.textContent?.trim() || remEl.getElementsByTagNameNS('*','CPF')[0]?.textContent?.trim() || ''
+      : '';
+    const destinatario = destEl
+      ? destEl.getElementsByTagNameNS('*','xNome')[0]?.textContent?.trim() || 'Não informado'
+      : 'Não informado';
+    const cnpj_destinatario = destEl
+      ? destEl.getElementsByTagNameNS('*','CNPJ')[0]?.textContent?.trim() || destEl.getElementsByTagNameNS('*','CPF')[0]?.textContent?.trim() || ''
+      : '';
+
+    // Cidades/UFs — leitura robusta em múltiplas formas do XML
+    const ini = doc.getElementsByTagNameNS('*', 'ini')[0];
+    const fim = doc.getElementsByTagNameNS('*', 'fim')[0];
+
+    // Origem: tenta ini > xMunIni > xMunEnv (nessa ordem de prioridade)
+    const cidade_origem = ini
+      ? ini.getElementsByTagNameNS('*','xMun')[0]?.textContent?.trim() || ''
+      : g('xMunIni') || '';
+
+    // UF Origem: prioridade UFIni (sigla direta) > bloco ini > UFEnv
+    // UFEnv é a UF do sistema emissor — pode não ser a UF de origem real
+    const uf_origem_raw = g('UFIni') || (ini
+      ? ini.getElementsByTagNameNS('*','UF')[0]?.textContent?.trim() || ini.getElementsByTagNameNS('*','cUF')[0]?.textContent?.trim() || ''
+      : '') || g('cUFIni') || '';
+
+    // Destino: tenta fim > xMunFim
+    const cidade_destino = fim
+      ? fim.getElementsByTagNameNS('*','xMun')[0]?.textContent?.trim() || ''
+      : g('xMunFim') || '';
+
+    // UF Destino: prioridade UFFim (sigla direta) > bloco fim
+    const uf_destino_raw = g('UFFim') || (fim
+      ? fim.getElementsByTagNameNS('*','UF')[0]?.textContent?.trim() || fim.getElementsByTagNameNS('*','cUF')[0]?.textContent?.trim() || ''
+      : '') || g('cUFFim') || '';
+
+    // Normaliza: se vier código numérico (ex: "33") mapeia para sigla (ex: "RJ")
+    const uf_origem  = uf_origem_raw  ? (uf_origem_raw.length  > 2 ? mapUF(uf_origem_raw)  : uf_origem_raw.toUpperCase())  : 'N/A';
+    const uf_destino = uf_destino_raw ? (uf_destino_raw.length > 2 ? mapUF(uf_destino_raw) : uf_destino_raw.toUpperCase()) : 'N/A';
+
+    // KM estimado baseado em dados do XML ou tabela de distâncias básica
+    const kmXml = parseFloat(g('qKM')) || 0;
+    const km_estimado = kmXml > 0 ? kmXml : estimarKM(uf_origem, uf_destino);
+
+    // Extrai ICMS e ISS do XML
+    const impEl = doc.getElementsByTagNameNS('*', 'imp')[0];
+    let v_icms = 0, p_icms = 0, v_iss = 0;
+    if (impEl) {
+      const vICMSEl = impEl.getElementsByTagNameNS('*','vICMS')[0];
+      const pICMSEl = impEl.getElementsByTagNameNS('*','pICMS')[0];
+      const vISSEl  = impEl.getElementsByTagNameNS('*','vISS')[0];
+      if (vICMSEl) v_icms = parseFloat(vICMSEl.textContent) || 0;
+      if (pICMSEl) p_icms = parseFloat(pICMSEl.textContent) || 0;
+      if (vISSEl)  v_iss  = parseFloat(vISSEl.textContent)  || 0;
+    }
+    // Fallback: se não achou vICMS mas tem pICMS, calcula
+    if (v_icms === 0 && p_icms > 0) v_icms = +(valor_frete * p_icms / 100).toFixed(2);
+
+    return {
+      numero_cte: nCT,
+      cnpj_emitente,
+      data_emissao,
+      emitente,
+      remetente,
+      cnpj_remetente,
+      destinatario,
+      cnpj_destinatario,
+      cidade_origem,
+      uf_origem,
+      cidade_destino,
+      uf_destino,
+      valor_frete,
+      km_estimado,
+      v_icms,
+      p_icms,
+      v_iss,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function mapUF(code) {
+  const m = {'11':'RO','12':'AC','13':'AM','14':'RR','15':'PA','16':'AP','17':'TO','21':'MA','22':'PI','23':'CE','24':'RN','25':'PB','26':'PE','27':'AL','28':'SE','29':'BA','31':'MG','32':'ES','33':'RJ','35':'SP','41':'PR','42':'SC','43':'RS','50':'MS','51':'MT','52':'GO','53':'DF'};
+  return m[code] || code;
+}
+
+// Alíquotas de ICMS por UF destino (CTe rodoviário)
+const ICMS_UF = {
+  RJ: 22, MG: 12, ES: 7, BA: 7, GO: 7,
+  SP: 12, PR: 12, SC: 12, RS: 12, PE: 12,
+  CE: 12, AM: 12, PA: 12, MA: 12, MT: 12,
+  MS: 12, DF: 12, AL: 12, SE: 12, RN: 12,
+  PB: 12, PI: 12, TO: 12, RO: 12, AC: 12,
+  AP: 12, RR: 12
+};
+
+function getAliqICMS(uf_origem, uf_destino) {
+  if (!uf_destino) return 0;
+  // Operação interna (mesma UF) — alíquota interna da UF
+  if (uf_origem === uf_destino) return ICMS_UF[uf_destino] || 12;
+  // Operação interestadual — usa alíquota da UF destino conforme configurado
+  return ICMS_UF[uf_destino] || 12;
+}
+
+function calcICMS(c) {
+  const aliq = getAliqICMS(c.uf_origem, c.uf_destino);
+  // Se o XML já trouxe o valor de ICMS, usa ele
+  if (c.v_icms && c.v_icms > 0) return { v: c.v_icms, aliq };
+  // Senão calcula com base na alíquota da UF
+  return { v: +((c.valor_frete||0) * aliq / 100).toFixed(2), aliq };
+}
+
+function estimarKM(ufO, ufD) {
+  if (ufO === ufD) return 150;
+  const distancias = {
+    'SP-RJ':430,'SP-MG':580,'SP-PR':408,'SP-RS':1100,'SP-BA':1960,'SP-GO':900,'SP-CE':2740,'SP-AM':3580,'SP-SC':700,'SP-MT':1600,'SP-MS':1000,'SP-DF':1000,'SP-PE':2600,'SP-MA':2900,
+    'RJ-MG':380,'RJ-BA':1600,'RJ-PR':850,'RJ-RS':1550,'RJ-GO':1200,'RJ-ES':520,'RJ-PE':2100,'RJ-CE':2600,'RJ-DF':1150,'RJ-SP':430,
+    'MG-BA':900,'MG-GO':700,'MG-DF':750,'MG-ES':500,'MG-RJ':380,'MG-SP':580,
+    'PR-SC':300,'PR-RS':700,'SC-RS':450,'BA-PE':800,'GO-DF':200,'GO-MT':900
+  };
+  const key1 = ufO+'-'+ufD, key2 = ufD+'-'+ufO;
+  return distancias[key1] || distancias[key2] || 800;
+}
+
+// ===== UPLOAD =====
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+}
+
+async function handleFiles(files) {
+  if (!files || files.length === 0) return;
+  const xmlFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.xml'));
+  if (xmlFiles.length === 0) return showUploadMsg('Nenhum arquivo XML encontrado.', 'error');
+
+  // SEGURANÇA: limita quantidade de arquivos por vez
+  if (xmlFiles.length > 100) return showUploadMsg('⚠️ Máximo de 100 arquivos por importação.', 'error');
+
+  show('uploadProgress');
+  document.getElementById('progFill').style.width = '0%';
+  let ok = 0, fail = 0, dup = 0;
+
+  for (let i = 0; i < xmlFiles.length; i++) {
+    const pct = Math.round(((i + 1) / xmlFiles.length) * 100);
+    document.getElementById('uploadStatus').textContent = `Processando ${i+1} de ${xmlFiles.length}: ${xmlFiles[i].name}`;
+    document.getElementById('progFill').style.width = pct + '%';
+    try {
+      // SEGURANÇA: valida tamanho do arquivo (máx 2MB por CTe)
+      if (xmlFiles[i].size > 2 * 1024 * 1024) { fail++; continue; }
+      // SEGURANÇA: valida tipo MIME
+      if (xmlFiles[i].type && !['text/xml','application/xml',''].includes(xmlFiles[i].type)) { fail++; continue; }
+
+      const xmlStr = await readFile(xmlFiles[i]);
+
+      // SEGURANÇA: valida se é XML real de CTe antes de processar
+      if (!isValidCTeXML(xmlStr)) { fail++; continue; }
+
+      const cte = parseCTeXML(xmlStr);
+      if (cte && cte.valor_frete > 0) {
+        cte.user_id = currentUser.id;
+
+        // Verifica duplicata: mesmo CNPJ + mesmo número de CTe
+        const { data: existe } = await sb.from('ctes')
+          .select('id')
+          .eq('user_id', currentUser.id)
+          .eq('numero_cte', cte.numero_cte)
+          .eq('cnpj_emitente', cte.cnpj_emitente || '')
+          .maybeSingle();
+
+        if (existe) {
+          dup++;
+        } else {
+          const { error } = await sb.from('ctes').insert(cte);
+          if (!error) {
+            ok++;
+          } else {
+            console.warn('Erro ao inserir CTe:', error.message, cte.numero_cte);
+            fail++;
+          }
+        }
+      } else fail++;
+    } catch { fail++; }
+    await sleep(80);
+  }
+
+  hide('uploadProgress');
+  document.getElementById('progFill').style.width = '0%';
+  let msg = `✅ ${ok} CTe importados com sucesso`;
+  if (dup > 0) msg += ` · ⏭️ ${dup} já existiam (ignorados)`;
+  if (fail > 0) msg += ` · ⚠️ ${fail} com erro`;
+  showUploadMsg(msg, ok > 0 ? 'success' : dup > 0 ? 'info' : 'error');
+  await loadCTEs();
+  renderImport();
+  loadDashboard();
+  renderFinanceiro();
+  renderRotas();
+  renderCustos();
+  renderPrevia();
+}
+
+function readFile(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsText(file, 'utf-8');
+  });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showUploadMsg(msg, type) {
+  document.getElementById('uploadMsg').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => document.getElementById('uploadMsg').innerHTML = '', 5000);
+}
+
+function renderImport() {
+  document.getElementById('cteCount').textContent = allCTEs.length + ' registros';
+  if (allCTEs.length === 0) {
+    document.getElementById('cteTable').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Nenhum CTe importado ainda</td></tr>';
+    return;
+  }
+  // SEGURANÇA: sanitiza todos os dados antes de inserir no DOM
+  document.getElementById('cteTable').innerHTML = allCTEs.map(c => `
+    <tr>
+      <td style="font-weight:700">${sanitize(c.numero_cte)}</td>
+      <td style="font-size:11px;color:var(--text2)">${sanitize(c.cnpj_emitente||'—')}</td>
+      <td>${sanitize(c.data_emissao)}</td>
+      <td style="color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sanitize(c.remetente)}</td>
+      <td>${sanitize(c.cidade_origem)}/${sanitize(c.uf_origem)}</td>
+      <td>${sanitize(c.cidade_destino)}</td>
+      <td><span class="badge bb">${sanitize(c.uf_destino)}</span></td>
+      <td style="font-weight:700">${fmt(c.valor_frete||0)}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteCTE('${sanitize(c.id)}')">✕</button></td>
+    </tr>`).join('');
+}
+
+async function deleteCTE(id) {
+  if (!confirm('Remover este CTe?')) return;
+  await sb.from('ctes').delete().eq('id', id);
+  allCTEs = allCTEs.filter(c => c.id !== id);
+  renderImport();
+  loadDashboard();
+  renderFinanceiro();
+  renderRotas();
+  renderCustos();
+  renderPrevia();
+  toast('CTe removido');
+}
+
+async function confirmDeleteAll() {
+  if (!confirm('Apagar TODOS os CTe? Esta ação não pode ser desfeita.')) return;
+  await sb.from('ctes').delete().eq('user_id', currentUser.id);
+  allCTEs = [];
+  renderImport();
+  loadDashboard();
+  toast('Todos os CTe foram removidos');
+}
+
+// ===== CALCS =====
+function calcCusto(cte) {
+  const km = costs.km * (cte.km_estimado || 0);
+  const adm = (cte.valor_frete || 0) * costs.adm / 100;
+  const seg = (cte.valor_frete || 0) * costs.seguro / 100;
+  return +(km + costs.pedagio + costs.fixo + adm + seg).toFixed(2);
+}
+
+function filterByPeriod(data) {
+  const days        = parseInt(document.getElementById('globalPeriod')?.value) || 9999;
+  const ano         = document.getElementById('globalAno')?.value         || '';
+  const mes         = document.getElementById('globalMes')?.value         || '';
+  const cnpj        = document.getElementById('globalCNPJ')?.value        || '';
+  const cnpjTomador = document.getElementById('globalCNPJTomador')?.value  || '';
+  const cnpjDest    = document.getElementById('globalCNPJDest')?.value     || '';
+  let filtered = data;
+
+  // Filtro por período relativo (dias)
+  if (days < 9999) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    filtered = filtered.filter(c => {
+      if (!c.data_emissao) return true;
+      return new Date(c.data_emissao + 'T00:00:00') >= cutoff;
+    });
+  }
+  // Filtro por ano específico
+  if (ano) filtered = filtered.filter(c => (c.data_emissao||'').startsWith(ano));
+  // Filtro por mês específico (ex: '03' = março de qualquer ano)
+  if (mes) filtered = filtered.filter(c => (c.data_emissao||'').substring(5,7) === mes);
+  // Filtro por CNPJ emitente
+  if (cnpj)        filtered = filtered.filter(c => c.cnpj_emitente    === cnpj);
+  // Filtro por CNPJ tomador
+  if (cnpjTomador) filtered = filtered.filter(c => c.cnpj_remetente   === cnpjTomador);
+  // Filtro por CNPJ destinatário
+  if (cnpjDest)    filtered = filtered.filter(c => c.cnpj_destinatario === cnpjDest);
+
+  return filtered;
+}
+
+function fmtCNPJ(cnpj) {
+  if (!cnpj) return cnpj;
+  return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+}
+
+function populateSelect(selId, values, labelFn, defaultLabel) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = `<option value="">${defaultLabel}</option>`;
+  values.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = labelFn(v);
+    sel.appendChild(opt);
+  });
+  if (current && values.includes(current)) sel.value = current;
+}
+
+function updateCNPJFilter() {
+  // Transportadora (emitente)
+  const cnpjsEmit = [...new Set(allCTEs.map(c => c.cnpj_emitente).filter(Boolean))].sort();
+  populateSelect('globalCNPJ', cnpjsEmit,
+    v => fmtCNPJ(v),
+    'Todos'
+  );
+
+  // Tomador (remetente) — mostra nome + CNPJ
+  const tomadores = {};
+  allCTEs.forEach(c => { if (c.cnpj_remetente) tomadores[c.cnpj_remetente] = c.remetente || c.cnpj_remetente; });
+  const cnpjsTom = Object.keys(tomadores).sort();
+  populateSelect('globalCNPJTomador', cnpjsTom,
+    v => `${fmtCNPJ(v)} — ${tomadores[v]?.substring(0,20) || ''}`,
+    'Todos'
+  );
+
+  // Cliente final (destinatário) — mostra nome + CNPJ
+  const destinos = {};
+  allCTEs.forEach(c => { if (c.cnpj_destinatario) destinos[c.cnpj_destinatario] = c.destinatario || c.cnpj_destinatario; });
+  const cnpjsDest = Object.keys(destinos).sort();
+  populateSelect('globalCNPJDest', cnpjsDest,
+    v => `${fmtCNPJ(v)} — ${destinos[v]?.substring(0,20) || ''}`,
+    'Todos'
+  );
+}
+
+function applyGlobalFilters() {
+  updateFiltrosBadge();
+  const page = document.querySelector('.page.active')?.id?.replace('page-','');
+  if (page === 'dashboard' || !page) loadDashboard();
+  if (page === 'financeiro') renderFinanceiro();
+  if (page === 'rotas') renderRotas();
+  if (page === 'relatorios') renderPrevia();
+}
+
+function limparFiltros() {
+  document.getElementById('globalPeriod').value      = '9999';
+  document.getElementById('globalAno').value         = '';
+  document.getElementById('globalMes').value         = '';
+  document.getElementById('globalCNPJ').value        = '';
+  document.getElementById('globalCNPJTomador').value = '';
+  document.getElementById('globalCNPJDest').value    = '';
+  updateFiltrosBadge();
+  applyGlobalFilters();
+}
+
+function toggleFiltros() {
+  const p = document.getElementById('filtrosPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function updateFiltrosBadge() {
+  const vals = [
+    document.getElementById('globalPeriod')?.value,
+    document.getElementById('globalAno')?.value,
+    document.getElementById('globalMes')?.value,
+    document.getElementById('globalCNPJ')?.value,
+    document.getElementById('globalCNPJTomador')?.value,
+    document.getElementById('globalCNPJDest')?.value,
+  ];
+  const ativos = vals.filter(v => v && v !== '9999').length;
+  const badge = document.getElementById('filtrosBadge');
+  const info  = document.getElementById('filtrosAtivosInfo');
+  const btn   = document.getElementById('btnFiltros');
+  if (badge) {
+    badge.style.display = ativos > 0 ? 'inline' : 'none';
+    badge.textContent = ativos;
+  }
+  if (btn) btn.style.borderColor = ativos > 0 ? 'var(--blue)' : '';
+  if (info) info.textContent = ativos > 0 ? `${ativos} filtro(s) ativo(s)` : 'Nenhum filtro ativo';
+}
+
+function updateAnoFilter() {
+  const anos = [...new Set(allCTEs.map(c => (c.data_emissao||'').substring(0,4)).filter(Boolean))].sort().reverse();
+  const sel = document.getElementById('globalAno');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos os anos</option>';
+  anos.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a; opt.textContent = a;
+    sel.appendChild(opt);
+  });
+  if (current && anos.includes(current)) sel.value = current;
+}
+
+// ===== DASHBOARD =====
+function loadDashboard() {
+  const data = filterByPeriod(allCTEs);
+  const total     = data.reduce((s,c) => s+(c.valor_frete||0), 0);
+  const totalC    = data.reduce((s,c) => s+calcCusto(c), 0);
+  const totalICMS = data.reduce((s,c) => s+calcICMS(c).v, 0);
+  const lucro     = total - totalC - totalICMS;
+  const margem    = total > 0 ? lucro/total*100 : 0;
+
+  document.getElementById('m-receita').textContent = fmt(total);
+  document.getElementById('m-lucro').textContent   = fmt(lucro);
+  document.getElementById('m-lucro-sub').textContent = 'margem ' + pct(margem);
+  document.getElementById('m-cte').textContent     = data.length;
+  document.getElementById('m-margem').textContent  = pct(margem);
+  if(document.getElementById('m-icms')) document.getElementById('m-icms').textContent = fmt(totalICMS);
+
+  // ---- Gráfico principal: barras empilhadas por UF + linha de margem ----
+  const mesFiltro = document.getElementById('globalMes')?.value || '';
+  // Se mês específico filtrado → agrupa por DIA; senão → por mês
+  const granularidade = mesFiltro ? 'dia' : 'mes';
+
+  const byMonthUF = {};
+  const byMonth   = {};
+  const ufSet     = new Set();
+
+  data.forEach(c => {
+    // chave: dia completo (2025-03-15) se mês selecionado, senão só ano-mês
+    const m  = granularidade === 'dia'
+      ? (c.data_emissao||'').substring(0,10)
+      : (c.data_emissao||'').substring(0,7);
+    const uf = c.uf_destino || 'N/A';
+    if (!byMonthUF[m]) byMonthUF[m] = {};
+    byMonthUF[m][uf] = (byMonthUF[m][uf]||0) + (c.valor_frete||0);
+    if (!byMonth[m])  byMonth[m] = {rec:0, custo:0, icms:0};
+    byMonth[m].rec   += c.valor_frete||0;
+    byMonth[m].custo += calcCusto(c);
+    byMonth[m].icms  += calcICMS(c).v;
+    ufSet.add(uf);
+  });
+
+  const meses = Object.keys(byMonthUF).sort();
+  const nomeMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const mesLabels = meses.map(m => {
+    if (granularidade === 'dia') {
+      // mostra "15/Mar" para dia
+      const [y,mo,d] = m.split('-');
+      return d + '/' + nomeMes[+mo-1];
+    }
+    const [y,mo] = m.split('-');
+    return nomeMes[+mo-1] + '/' + y.slice(2);
+  });
+
+  // Ordena UFs por receita total (maior primeiro)
+  const ufList = [...ufSet].sort((a,b) => {
+    const ta = meses.reduce((s,m) => s+(byMonthUF[m][a]||0), 0);
+    const tb = meses.reduce((s,m) => s+(byMonthUF[m][b]||0), 0);
+    return tb - ta;
+  });
+
+  // Paleta de cores para UFs
+  const palette = [
+    '#185FA5','#1D9E75','#D85A30','#854F0B','#534AB7',
+    '#D4537E','#639922','#0F6E56','#BA7517','#993556',
+    '#3B6D11','#185FA5','#0C447C','#3C3489','#993C1D',
+  ];
+
+  // Datasets de barras — uma por UF
+  const barDatasets = ufList.map((uf, i) => ({
+    label: uf,
+    type: 'bar',
+    data: meses.map(m => Math.round(byMonthUF[m][uf]||0)),
+    backgroundColor: palette[i % palette.length],
+    borderRadius: i === ufList.length-1 ? 4 : 0,
+    borderSkipped: false,
+    stack: 'receita',
+    yAxisID: 'yBar',
+    order: 2,
+  }));
+
+  // Dataset de linha — margem real por mês
+  const margemData = meses.map(m => {
+    const v = byMonth[m];
+    if (!v || v.rec === 0) return 0;
+    return +((v.rec - v.custo - v.icms) / v.rec * 100).toFixed(1);
+  });
+
+  const lineDataset = {
+    label: 'Margem Real %',
+    type: 'line',
+    data: margemData,
+    borderColor: '#534AB7',
+    backgroundColor: 'rgba(83,74,183,0.10)',
+    borderWidth: 2.5,
+    tension: 0.4,
+    fill: true,
+    pointRadius: 5,
+    pointBackgroundColor: '#534AB7',
+    pointBorderColor: '#fff',
+    pointBorderWidth: 2,
+    yAxisID: 'yLine',
+    order: 1,
+    stack: undefined,
+
+  };
+
+  // Plugin inline para mostrar valores da margem diretamente no gráfico
+  const margemLabelPlugin = {
+    id: 'margemLabels',
+    afterDatasetsDraw(chart) {
+      const ds = chart.data.datasets.find(d => d.label === 'Margem Real %');
+      if (!ds) return;
+      const dsIndex = chart.data.datasets.indexOf(ds);
+      const meta = chart.getDatasetMeta(dsIndex);
+      if (!meta || !meta.data) return;
+      const ctx2 = chart.ctx;
+      ctx2.save();
+      ctx2.font = 'bold 11px -apple-system, sans-serif';
+      ctx2.fillStyle = '#534AB7';
+      ctx2.textAlign = 'center';
+      meta.data.forEach((point, i) => {
+        const val = ds.data[i];
+        if (val && val > 0) {
+          ctx2.fillText(val.toFixed(1) + '%', point.x, point.y - 10);
+        }
+      });
+      ctx2.restore();
+    }
+  };
+
+  safeChart('chartDashMain', {
+    type: 'bar',
+    data: { labels: mesLabels, datasets: [...barDatasets, lineDataset] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: item => item.parsed.y !== 0,
+          callbacks: {
+            title: ctx => {
+              if (!ctx.length) return '';
+              const ds = ctx[0].dataset;
+              const mes = ctx[0].label;
+              if (ds.yAxisID === 'yLine') return mes + ' — Margem Real';
+              return mes + ' — ' + ds.label;
+            },
+            label: ctx => {
+              if (ctx.dataset.yAxisID === 'yLine')
+                return ` ${ctx.parsed.y.toFixed(1)}%`;
+              return ` R$ ${ctx.parsed.y.toLocaleString('pt-BR')}`;
+            },
+            labelColor: ctx => ({
+              borderColor: ctx.dataset.backgroundColor || ctx.dataset.borderColor,
+              backgroundColor: ctx.dataset.backgroundColor || ctx.dataset.borderColor,
+              borderRadius: 4,
+            }),
+          }
+        }
+      },
+      scales: {
+        yBar: {
+          type: 'linear',
+          position: 'left',
+          stacked: true,
+          ticks: { callback: v => 'R$' + Math.round(v/1000) + 'k', font:{size:11} },
+          grid: { color: 'rgba(0,0,0,0.05)' },
+        },
+        yLine: {
+          type: 'linear',
+          position: 'right',
+          ticks: { callback: v => v + '%', font:{size:11} },
+          grid: { display: false },
+        },
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font:{size:11} }
+        }
+      }
+    },
+    plugins: [margemLabelPlugin]
+  });
+
+  // Legenda das UFs com bolinhas coloridas
+  const legendEl = document.getElementById('dashLegendaUF');
+  if (legendEl) {
+    legendEl.innerHTML = ufList.map((uf, i) => {
+      const cor = palette[i % palette.length];
+      return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)">
+        <span style="width:10px;height:10px;border-radius:50%;background:${cor};display:inline-block;flex-shrink:0"></span>${uf}
+      </span>`;
+    }).join('') +
+    `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)">
+      <span style="width:10px;height:10px;border-radius:50%;background:#534AB7;display:inline-block;flex-shrink:0"></span>Margem Real %
+    </span>`;
+  }
+}
+
+// ===== FINANCEIRO =====
+function renderFinanceiro() {
+  const data = filterByPeriod(allCTEs);
+  const total = data.reduce((s,c) => s+(c.valor_frete||0), 0);
+  const totalC = data.reduce((s,c) => s+calcCusto(c), 0);
+  const totalICMS = data.reduce((s,c) => s+calcICMS(c).v, 0);
+  const lucro_sem = total - totalC;
+  const lucro_com = total - totalC - totalICMS;
+  const margem = total > 0 ? lucro_com/total*100 : 0;
+  document.getElementById('f-receita').textContent = fmt(total);
+  document.getElementById('f-custos').textContent = fmt(totalC);
+  document.getElementById('f-icms').textContent = fmt(totalICMS);
+  document.getElementById('f-icms-pct').textContent = total > 0 ? pct(totalICMS/total*100)+' da receita' : '';
+  document.getElementById('f-lucro-sem').textContent = fmt(lucro_sem);
+  document.getElementById('f-lucro').textContent = fmt(lucro_com);
+  document.getElementById('f-margem').textContent = pct(margem);
+
+  safeChart('chartFinComp', {
+    type:'bar', data:{labels:['Receita','Custos','Lucro'],datasets:[{data:[Math.round(total),Math.round(totalC),Math.round(lucro_com)],backgroundColor:['#185FA5','#D85A30','#1D9E75'],borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'R$'+Math.round(v/1000)+'k'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}
+  });
+
+  const byMonth = {};
+  data.forEach(c => {
+    const m = (c.data_emissao||'').substring(0,7);
+    if (!byMonth[m]) byMonth[m] = {rec:0,cus:0};
+    byMonth[m].rec += c.valor_frete||0;
+    byMonth[m].cus += calcCusto(c);
+  });
+  const meses = Object.keys(byMonth).sort().slice(-6);
+  safeChart('chartMargem', {
+    type:'line', data:{labels:meses.map(m=>{const[y,mo]=m.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][+mo-1];}),
+      datasets:[{label:'Margem %',data:meses.map(m=>{const v=byMonth[m];return v.rec>0?+((v.rec-v.cus)/v.rec*100).toFixed(1):0;}),borderColor:'#534AB7',backgroundColor:'rgba(83,74,183,0.07)',tension:.4,fill:true,borderWidth:2,pointRadius:4,pointBackgroundColor:'#534AB7'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}
+  });
+  renderFinCTE();
+}
+
+function finTab(t, el) {
+  document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+  if (el) el.classList.add('active');
+  ['finGeral','finCTE','finCidade','finUF','finImpostos','finContas','finPagar'].forEach(id => {
+    const el2 = document.getElementById(id);
+    if (el2) el2.style.display = 'none';
+  });
+  const map = {geral:'finGeral',cte:'finCTE',cidade:'finCidade',uf:'finUF',impostos:'finImpostos',contas:'finContas',pagar:'finPagar'};
+  const target = document.getElementById(map[t]);
+  if (target) target.style.display = 'block';
+  if (t==='cte')      renderFinCTE();
+  if (t==='cidade')   renderFinCidade();
+  if (t==='uf')       renderFinUF();
+  if (t==='impostos') renderImpostos();
+  if (t==='contas')   renderContasReceber();
+  if (t==='pagar')    renderContasPagar();
+}
+
+function renderFinCTE() {
+  const ufSel = document.getElementById('filtUF').value;
+  const ufOpt = document.getElementById('filtUF');
+  if (ufOpt.options.length <= 1) {
+    [...new Set(allCTEs.map(c=>c.uf_destino).filter(Boolean))].sort().forEach(u => {
+      const o = document.createElement('option'); o.value=u; o.textContent=u; ufOpt.appendChild(o);
+    });
+  }
+  let data = filterByPeriod(allCTEs);
+  if (ufSel) data = data.filter(c => c.uf_destino === ufSel);
+  const dtI = document.getElementById('filtDtIni').value;
+  const dtF = document.getElementById('filtDtFim').value;
+  if (dtI) data = data.filter(c => c.data_emissao >= dtI);
+  if (dtF) data = data.filter(c => c.data_emissao <= dtF);
+  document.getElementById('finCTETable').innerHTML = data.length === 0
+    ? '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text3)">Nenhum CTe encontrado</td></tr>'
+    : data.map(c => {
+        const frete = c.valor_frete||0;
+        const cu = calcCusto(c);
+        const icms = calcICMS(c);
+        const lu_sem = frete - cu;
+        const lu_com = frete - cu - icms.v;
+        const mg = frete > 0 ? lu_com / frete * 100 : 0;
+        const mc = mg > 20 ? 'bg' : mg > 10 ? 'ba' : 'br';
+        const ufOrigBadge = c.uf_origem ? `<span class="badge bb">${c.uf_origem}</span>` : '—';
+        const ufDestBadge = c.uf_destino ? `<span class="badge bb">${c.uf_destino}</span>` : '—';
+        return `<tr>
+          <td style="font-weight:700;font-size:12px">${sanitize(c.numero_cte)}</td>
+          <td>${ufOrigBadge}</td>
+          <td>${ufDestBadge}</td>
+          <td style="font-weight:600;color:var(--red)">${icms.aliq}%</td>
+          <td style="color:var(--red)">${fmt(icms.v)}</td>
+          <td>${c.data_emissao||''}</td>
+          <td>${fmt(frete)}</td>
+          <td>${fmt(cu)}</td>
+          <td style="color:var(--text2)">${fmt(lu_sem)}</td>
+          <td style="font-weight:700">${fmt(lu_com)}</td>
+          <td><span class="badge ${mc}">${pct(mg)}</span></td>
+        </tr>`;
+      }).join('');
+}
+
+function renderFinCidade() {
+  const cidades = {};
+  filterByPeriod(allCTEs).forEach(c => {
+    const k = c.cidade_destino || 'N/A';
+    if (!cidades[k]) cidades[k] = {uf:c.uf_destino,n:0,rec:0,cus:0};
+    cidades[k].n++; cidades[k].rec+=c.valor_frete||0; cidades[k].cus+=calcCusto(c);
+  });
+  document.getElementById('finCidadeTable').innerHTML = Object.entries(cidades).sort((a,b)=>b[1].rec-a[1].rec).map(([cid,v])=>{
+    const lu=v.rec-v.cus, mg=v.rec>0?lu/v.rec*100:0;
+    return `<tr><td style="font-weight:700">${cid}</td><td><span class="badge bb">${v.uf||''}</span></td><td>${v.n}</td><td>${fmt(v.rec)}</td><td>${fmt(v.cus)}</td><td>${fmt(lu)}</td><td><span class="badge ${mg>20?'bg':mg>10?'ba':'br'}">${pct(mg)}</span></td></tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">Sem dados</td></tr>';
+}
+
+function renderFinUF() {
+  const ufs = {};
+  filterByPeriod(allCTEs).forEach(c => {
+    const k = c.uf_destino || 'N/A';
+    if (!ufs[k]) ufs[k] = {n:0,rec:0,cus:0};
+    ufs[k].n++; ufs[k].rec+=c.valor_frete||0; ufs[k].cus+=calcCusto(c);
+  });
+  document.getElementById('finUFTable').innerHTML = Object.entries(ufs).sort((a,b)=>b[1].rec-a[1].rec).map(([uf,v])=>{
+    const lu=v.rec-v.cus, mg=v.rec>0?lu/v.rec*100:0;
+    return `<tr><td><span class="badge bb">${uf}</span></td><td>${v.n}</td><td>${fmt(v.rec)}</td><td>${fmt(v.cus)}</td><td>${fmt(lu)}</td><td><span class="badge ${mg>20?'bg':mg>10?'ba':'br'}">${pct(mg)}</span></td></tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text3)">Sem dados</td></tr>';
+}
+
+// ===== ROTAS =====
+function renderRotas() {
+  const rotas = {};
+  filterByPeriod(allCTEs).forEach(c => {
+    const k = (c.cidade_origem||'?')+' → '+(c.cidade_destino||'?');
+    if (!rotas[k]) rotas[k] = {n:0,rec:0,cus:0,km:c.km_estimado||0};
+    rotas[k].n++; rotas[k].rec+=c.valor_frete||0; rotas[k].cus+=calcCusto(c);
+  });
+  const arr = Object.entries(rotas).map(([r,v])=>{const lu=v.rec-v.cus,mg=v.rec>0?lu/v.rec*100:0;return{rota:r,...v,lucro:lu,margem:mg};}).sort((a,b)=>b.margem-a.margem);
+
+  document.getElementById('rotasTable').innerHTML = arr.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text3)">Nenhuma rota encontrada</td></tr>'
+    : arr.map(r=>{
+        const mc=r.margem>20?'bg':r.margem>10?'ba':'br';
+        const pf=r.margem>20?'✅ Ótima':r.margem>10?'🔶 Regular':'🔴 Baixa';
+        return `<tr><td style="font-weight:700;font-size:12px">${r.rota}</td><td>${r.n}</td><td>${Math.round(r.km)} km</td><td>${fmt(r.rec)}</td><td>${fmt(r.cus)}</td><td>${fmt(r.lucro)}</td><td><span class="badge ${mc}">${pct(r.margem)}</span></td><td style="font-size:12px">${pf}</td></tr>`;
+      }).join('');
+
+  const top5=arr.slice(0,5), bot5=arr.slice(-5).reverse();
+  safeChart('chartTopLucro',{
+    type:'bar',data:{labels:top5.map(r=>r.rota.split(' → ')[1]||r.rota),datasets:[{data:top5.map(r=>+r.margem.toFixed(1)),backgroundColor:'#1D9E75',borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+  });
+  safeChart('chartBottomLucro',{
+    type:'bar',data:{labels:bot5.map(r=>r.rota.split(' → ')[1]||r.rota),datasets:[{data:bot5.map(r=>+r.margem.toFixed(1)),backgroundColor:'#D85A30',borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v+'%'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+  });
+}
+
+// ===== CUSTOS =====
+function renderCustos() {
+  const data = filterByPeriod(allCTEs);
+  const totalC = data.reduce((s,c)=>s+calcCusto(c),0);
+  document.getElementById('c-medio').textContent = data.length ? fmt(totalC/data.length) : '—';
+  document.getElementById('c-total').textContent = fmt(totalC);
+
+  const kmT=data.reduce((s,c)=>s+costs.km*(c.km_estimado||0),0);
+  const pedT=data.length*costs.pedagio, fixT=data.length*costs.fixo;
+  const admT=data.reduce((s,c)=>s+(c.valor_frete||0)*costs.adm/100,0);
+  const segT=data.reduce((s,c)=>s+(c.valor_frete||0)*costs.seguro/100,0);
+  safeChart('chartCustoComp',{
+    type:'doughnut',
+    data:{labels:['Custo/KM','Pedágio','Custo fixo','Taxa adm.','Seguro'],datasets:[{data:[+kmT.toFixed(0),+pedT.toFixed(0),+fixT.toFixed(0),+admT.toFixed(0),+segT.toFixed(0)],backgroundColor:['#185FA5','#D85A30','#1D9E75','#854F0B','#534AB7'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:10,padding:8}}}}
+  });
+}
+
+// ===== RELATÓRIOS =====
+function renderPrevia() {
+  const data = filterByPeriod(allCTEs).slice(0, 8);
+  document.getElementById('prevTable').innerHTML = data.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3)">Sem dados</td></tr>'
+    : data.map(c=>{const cu=calcCusto(c),lu=(c.valor_frete||0)-cu,mg=(c.valor_frete||0)>0?lu/(c.valor_frete||0)*100:0;return`<tr><td>${c.numero_cte}</td><td style="font-size:11px;color:var(--text2)">${c.cidade_origem||'?'}→${c.cidade_destino||'?'}</td><td>${fmt(c.valor_frete||0)}</td><td>${fmt(lu)}</td><td>${pct(mg)}</td></tr>`;}).join('');
+}
+
+function getExportData() {
+  const days = parseInt(document.getElementById('repPeriodo').value) || 30;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+  return allCTEs.filter(c => days >= 9999 || new Date(c.data_emissao) >= cutoff);
+}
+
+function exportCSV() {
+  const data = getExportData();
+  const rows = [['CTe','Data','Emitente','Remetente','Dest.','Origem','UF Orig','Destino','UF Dest','Receita','Custo','Lucro','Margem%']];
+  data.forEach(c=>{const cu=calcCusto(c),lu=(c.valor_frete||0)-cu,mg=(c.valor_frete||0)>0?lu/(c.valor_frete||0)*100:0;rows.push([c.numero_cte,c.data_emissao,c.emitente,c.remetente,c.destinatario,c.cidade_origem,c.uf_origem,c.cidade_destino,c.uf_destino,(c.valor_frete||0).toFixed(2),cu.toFixed(2),lu.toFixed(2),mg.toFixed(1)]);});
+  const csv = rows.map(r=>r.map(v=>'"'+(v||'')+'"').join(',')).join('\n');
+  download('data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv), 'relatorio_transportlog.csv');
+  toast('✅ CSV exportado!');
+}
+
+function exportExcel() {
+  const data = getExportData();
+  const ws_data = [['CTe','Data','Emitente','Origem','UF Orig','Destino','UF Dest','Receita (R$)','Custo (R$)','Lucro (R$)','Margem (%)']];
+  data.forEach(c=>{const cu=calcCusto(c),lu=(c.valor_frete||0)-cu,mg=(c.valor_frete||0)>0?lu/(c.valor_frete||0)*100:0;ws_data.push([c.numero_cte,c.data_emissao,c.emitente,c.cidade_origem,c.uf_origem,c.cidade_destino,c.uf_destino,+(c.valor_frete||0).toFixed(2),+cu.toFixed(2),+lu.toFixed(2),+mg.toFixed(1)]);});
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  ws['!cols'] = [{wch:14},{wch:12},{wch:20},{wch:16},{wch:8},{wch:16},{wch:8},{wch:14},{wch:14},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Relatório CTe');
+  XLSX.writeFile(wb, 'relatorio_transportlog.xlsx');
+  toast('✅ Excel exportado!');
+}
+
+// ===== UTILS =====
+function fmt(v){return'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function pct(v){return Number(v).toFixed(1)+'%'}
+function val(id){return document.getElementById(id).value.trim()}
+function show(id){document.getElementById(id).style.display=''}
+function hide(id){document.getElementById(id).style.display='none'}
+function destroyChart(id){if(charts[id]){try{charts[id].destroy();}catch(e){}delete charts[id];}}
+function safeChart(id, config) {
+  if (typeof Chart === 'undefined') return null;
+  destroyChart(id);
+  const el = document.getElementById(id);
+  if (!el) return null;
+  try {
+    charts[id] = new Chart(el, config);
+    return charts[id];
+  } catch(e) { console.warn('Chart error:', e); return null; }
+}
+function download(href,name){const a=document.createElement('a');a.href=href;a.download=name;a.click();}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',2800);}
+function setLoading(id,loading,text){const b=document.getElementById(id);b.disabled=loading;b.textContent=loading?'Aguarde...':text;}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function isStrongPassword(pass) {
+  // Ao menos 8 chars, 1 letra, 1 número
+  return pass.length >= 8 && /[a-zA-Z]/.test(pass) && /[0-9]/.test(pass);
+}
+
+function isValidCTeXML(xmlStr) {
+  // SEGURANÇA: verifica se o XML contém marcadores básicos de CTe antes de processar
+  if (!xmlStr || xmlStr.length < 100) return false;
+  if (xmlStr.length > 2 * 1024 * 1024) return false; // 2MB max
+  // Deve conter tags típicas de CTe
+  const hasCTe = xmlStr.includes('CTe') || xmlStr.includes('cte') || xmlStr.includes('CTeProc');
+  const hasXML = xmlStr.includes('<?xml') || xmlStr.startsWith('<');
+  // Bloqueia scripts embutidos
+  const hasScript = /<script/i.test(xmlStr);
+  return hasCTe && hasXML && !hasScript;
+}
+
+// SEGURANÇA: deleteCTE com verificação de ownership
+async function deleteCTE(id) {
+  if (!id || typeof id !== 'string') return;
+  if (!confirm('Remover este CTe?')) return;
+  // RLS no Supabase já garante que só o dono pode deletar
+  const { error } = await sb.from('ctes').delete().eq('id', id).eq('user_id', currentUser.id);
+  if (!error) {
+    allCTEs = allCTEs.filter(c => c.id !== id);
+    renderImport();
+    loadDashboard();
+    renderFinanceiro();
+    renderRotas();
+    renderCustos();
+    renderPrevia();
+    toast('CTe removido');
+  } else {
+    toast('⚠️ Erro ao remover CTe');
+  }
+}
+
+
+// ===== FROTA =====
+let allFrota = [];
+
+async function loadFrota() {
+  const { data, error } = await sb.from('frota').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  if (!error && data) allFrota = data;
+}
+
+function frotaTab(t, el) {
+  document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  ['frotaLista','frotaManutencao','frotaDocumentos'].forEach(id => document.getElementById(id).style.display = 'none');
+  const map = {lista:'frotaLista', manutencao:'frotaManutencao', documentos:'frotaDocumentos'};
+  document.getElementById(map[t]).style.display = 'block';
+}
+
+function toggleCarreta() {
+  const tipo = document.getElementById('frotaTipo').value;
+  const grupo = document.getElementById('grupoPlacaCarreta');
+  grupo.style.display = tipo === 'carreta' ? 'block' : 'none';
+  if (tipo !== 'carreta') document.getElementById('frotaPlacaCarreta').value = '';
+}
+
+function openFrotaModal(id) {
+  const modal = document.getElementById('frotaModal');
+  modal.style.display = 'flex';
+  document.getElementById('frotaModalMsg').innerHTML = '';
+  if (id) {
+    const v = allFrota.find(f => f.id === id);
+    if (!v) return;
+    document.getElementById('modalFrotaTitle').textContent = 'Editar veículo';
+    document.getElementById('frotaEditId').value = id;
+    document.getElementById('frotaTipo').value = v.tipo || 'truck';
+    document.getElementById('frotaPlacaCavalo').value = v.placa_cavalo || '';
+    document.getElementById('frotaPlacaCarreta').value = v.placa_carreta || '';
+    document.getElementById('frotaModelo').value = v.modelo || '';
+    document.getElementById('frotaAno').value = v.ano || '';
+    document.getElementById('frotaKmAtual').value = v.km_atual || '';
+    document.getElementById('frotaStatus').value = v.status || 'ativo';
+    document.getElementById('frotaUltimoOleo').value = v.ultimo_oleo || '';
+    document.getElementById('frotaKmOleo').value = v.km_oleo || '';
+    document.getElementById('frotaUltimaRevisao').value = v.ultima_revisao || '';
+    document.getElementById('frotaProximaRevisao').value = v.proxima_revisao || '';
+    document.getElementById('frotaTrocaPneu').value = v.troca_pneu || '';
+    document.getElementById('frotaKmPneu').value = v.km_pneu || '';
+    document.getElementById('frotaLicenciamento').value = v.licenciamento || '';
+    document.getElementById('frotaSeguro').value = v.seguro_venc || '';
+    document.getElementById('frotaObs').value = v.observacoes || '';
+    toggleCarreta();
+  } else {
+    document.getElementById('modalFrotaTitle').textContent = 'Cadastrar veículo';
+    document.getElementById('frotaEditId').value = '';
+    ['frotaTipo','frotaPlacaCavalo','frotaPlacaCarreta','frotaModelo','frotaAno','frotaKmAtual','frotaUltimoOleo','frotaKmOleo','frotaUltimaRevisao','frotaProximaRevisao','frotaTrocaPneu','frotaKmPneu','frotaLicenciamento','frotaSeguro','frotaObs'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
+    });
+    toggleCarreta();
+  }
+}
+
+function closeFrotaModal() {
+  document.getElementById('frotaModal').style.display = 'none';
+}
+
+async function salvarFrota() {
+  const placa = document.getElementById('frotaPlacaCavalo').value.trim();
+  if (!placa) {
+    document.getElementById('frotaModalMsg').innerHTML = '<div class="alert alert-error">Informe a placa do veículo</div>';
+    return;
+  }
+  setLoading('btnSalvarFrota', true, 'Salvando...');
+  const dados = {
+    user_id: currentUser.id,
+    tipo: document.getElementById('frotaTipo').value,
+    placa_cavalo: sanitize(placa.toUpperCase()),
+    placa_carreta: sanitize(document.getElementById('frotaPlacaCarreta').value.trim().toUpperCase()),
+    modelo: sanitize(document.getElementById('frotaModelo').value.trim()),
+    ano: parseInt(document.getElementById('frotaAno').value) || null,
+    km_atual: parseInt(document.getElementById('frotaKmAtual').value) || null,
+    status: document.getElementById('frotaStatus').value,
+    ultimo_oleo: document.getElementById('frotaUltimoOleo').value || null,
+    km_oleo: parseInt(document.getElementById('frotaKmOleo').value) || null,
+    ultima_revisao: document.getElementById('frotaUltimaRevisao').value || null,
+    proxima_revisao: document.getElementById('frotaProximaRevisao').value || null,
+    troca_pneu: document.getElementById('frotaTrocaPneu').value || null,
+    km_pneu: parseInt(document.getElementById('frotaKmPneu').value) || null,
+    licenciamento: document.getElementById('frotaLicenciamento').value || null,
+    seguro_venc: document.getElementById('frotaSeguro').value || null,
+    observacoes: sanitize(document.getElementById('frotaObs').value.trim()),
+  };
+  const editId = document.getElementById('frotaEditId').value;
+  let error;
+  if (editId) {
+    ({ error } = await sb.from('frota').update(dados).eq('id', editId).eq('user_id', currentUser.id));
+  } else {
+    ({ error } = await sb.from('frota').insert(dados));
+  }
+  setLoading('btnSalvarFrota', false, 'Salvar veículo');
+  if (error) {
+    document.getElementById('frotaModalMsg').innerHTML = `<div class="alert alert-error">${error.message}</div>`;
+  } else {
+    closeFrotaModal();
+    await loadFrota();
+    renderFrota();
+    toast(editId ? '✅ Veículo atualizado!' : '✅ Veículo cadastrado!');
+  }
+}
+
+async function deletarVeiculo(id) {
+  if (!confirm('Remover este veículo?')) return;
+  await sb.from('frota').delete().eq('id', id).eq('user_id', currentUser.id);
+  allFrota = allFrota.filter(f => f.id !== id);
+  renderFrota();
+  toast('Veículo removido');
+}
+
+function diasParaVencer(dataStr) {
+  if (!dataStr) return null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const data = new Date(dataStr + 'T00:00:00');
+  return Math.ceil((data - hoje) / (1000 * 60 * 60 * 24));
+}
+
+function badgeVencimento(dataStr) {
+  if (!dataStr) return '<span style="color:var(--text3);font-size:11px">Não informado</span>';
+  const dias = diasParaVencer(dataStr);
+  const d = new Date(dataStr + 'T00:00:00').toLocaleDateString('pt-BR');
+  if (dias < 0) return `<span class="badge br">Vencido (${d})</span>`;
+  if (dias <= 30) return `<span class="badge ba">Vence em ${dias}d (${d})</span>`;
+  return `<span class="badge bg">${d}</span>`;
+}
+
+function badgeManutencao(dataStr) {
+  if (!dataStr) return '<span style="color:var(--text3);font-size:11px">Não informado</span>';
+  const dias = diasParaVencer(dataStr);
+  const d = new Date(dataStr + 'T00:00:00').toLocaleDateString('pt-BR');
+  if (dias < 0) return `<span class="badge br">Atrasado (${d})</span>`;
+  if (dias <= 15) return `<span class="badge ba">Em ${dias}d</span>`;
+  return `<span class="badge bg">${d}</span>`;
+}
+
+function tipoLabel(tipo) {
+  const m = {truck:'Caminhão',carreta:'Carreta',toco:'Toco',bitruck:'Bitruck',van:'Van'};
+  return m[tipo] || tipo;
+}
+
+function statusBadge(s) {
+  if (s === 'ativo') return '<span class="badge bg">Ativo</span>';
+  if (s === 'manutencao') return '<span class="badge ba">Manutenção</span>';
+  return '<span class="badge br">Inativo</span>';
+}
+
+function renderFrota() {
+  const total = allFrota.length;
+  const ativos = allFrota.filter(f => f.status === 'ativo').length;
+  const manut = allFrota.filter(f => f.status === 'manutencao').length;
+
+  // Conta alertas: venc próximo ou atrasado (30 dias)
+  let alertCount = 0;
+  const alertas = [];
+  allFrota.forEach(f => {
+    const checks = [
+      { campo: f.proxima_revisao, label: `Revisão do ${f.placa_cavalo}` },
+      { campo: f.licenciamento, label: `Licenciamento do ${f.placa_cavalo}` },
+      { campo: f.seguro_venc, label: `Seguro do ${f.placa_cavalo}` },
+    ];
+    checks.forEach(c => {
+      if (!c.campo) return;
+      const dias = diasParaVencer(c.campo);
+      if (dias !== null && dias <= 30) {
+        alertCount++;
+        const msg = dias < 0 ? `<strong>${c.label}</strong> — VENCIDO há ${Math.abs(dias)} dias` : `<strong>${c.label}</strong> — vence em ${dias} dias`;
+        alertas.push({ msg, critico: dias < 0 });
+      }
+    });
+  });
+
+  document.getElementById('fr-total').textContent = total;
+  document.getElementById('fr-ativos').textContent = ativos;
+  document.getElementById('fr-manutencao').textContent = manut;
+  document.getElementById('fr-alertas').textContent = alertCount;
+
+  // Alertas visuais
+  const alertEl = document.getElementById('frotaAlertas');
+  if (alertas.length > 0) {
+    alertEl.innerHTML = alertas.map(a =>
+      `<div class="alert ${a.critico ? 'alert-error' : 'alert-info'}" style="margin-bottom:6px">${a.critico ? '🚨' : '⚠️'} ${a.msg}</div>`
+    ).join('');
+  } else {
+    alertEl.innerHTML = '';
+  }
+
+  // Tabela lista
+  document.getElementById('frotaTable').innerHTML = allFrota.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Nenhum veículo cadastrado</td></tr>'
+    : allFrota.map(f => `
+      <tr>
+        <td style="font-weight:700">${sanitize(f.placa_cavalo||'')}</td>
+        <td>${f.placa_carreta ? sanitize(f.placa_carreta) : '<span style="color:var(--text3)">—</span>'}</td>
+        <td>${tipoLabel(f.tipo)}</td>
+        <td>${sanitize(f.modelo||'')}</td>
+        <td>${f.ano||'—'}</td>
+        <td>${f.km_atual ? f.km_atual.toLocaleString('pt-BR')+' km' : '—'}</td>
+        <td>${statusBadge(f.status)}</td>
+        <td style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="openFrotaModal('${f.id}')">✏️ Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="deletarVeiculo('${f.id}')">✕</button>
+        </td>
+      </tr>`).join('');
+
+  // Tabela manutenção
+  document.getElementById('frotaManutTable').innerHTML = allFrota.length === 0
+    ? '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">Nenhum veículo cadastrado</td></tr>'
+    : allFrota.map(f => {
+      const proxRev = diasParaVencer(f.proxima_revisao);
+      const sit = !f.proxima_revisao ? '<span style="color:var(--text3)">—</span>' : proxRev < 0 ? '<span class="badge br">Atrasado</span>' : proxRev <= 15 ? '<span class="badge ba">Urgente</span>' : '<span class="badge bg">Ok</span>';
+      return `<tr>
+        <td style="font-weight:700">${sanitize(f.placa_cavalo||'')}</td>
+        <td>${sanitize(f.modelo||'')}</td>
+        <td>${f.ultimo_oleo ? new Date(f.ultimo_oleo+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+        <td>${f.km_oleo ? f.km_oleo.toLocaleString('pt-BR')+' km' : '—'}</td>
+        <td>${f.ultima_revisao ? new Date(f.ultima_revisao+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+        <td>${badgeManutencao(f.proxima_revisao)}</td>
+        <td>${f.troca_pneu ? new Date(f.troca_pneu+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+        <td>${sit}</td>
+      </tr>`;
+    }).join('');
+
+  // Tabela documentos
+  document.getElementById('frotaDocTable').innerHTML = allFrota.length === 0
+    ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text3)">Nenhum veículo cadastrado</td></tr>'
+    : allFrota.map(f => `<tr>
+        <td style="font-weight:700">${sanitize(f.placa_cavalo||'')}</td>
+        <td>${sanitize(f.modelo||'')}</td>
+        <td>${f.licenciamento ? new Date(f.licenciamento+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+        <td>${badgeVencimento(f.licenciamento)}</td>
+        <td>${f.seguro_venc ? new Date(f.seguro_venc+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+        <td>${badgeVencimento(f.seguro_venc)}</td>
+      </tr>`).join('');
+}
+
+
+function renderImpostos() {
+  const data = filterByPeriod(allCTEs);
+  const totalReceita = data.reduce((s,c) => s+(c.valor_frete||0), 0);
+  const totalICMS = data.reduce((s,c) => s+(c.v_icms||0), 0);
+  const totalISS  = data.reduce((s,c) => s+(c.v_iss||0),  0);
+  const totalImp  = totalICMS + totalISS;
+  const comImp    = data.filter(c => (c.v_icms||0)+(c.v_iss||0) > 0).length;
+
+  document.getElementById('imp-icms').textContent = fmt(totalICMS);
+  document.getElementById('imp-iss').textContent  = fmt(totalISS);
+  document.getElementById('imp-total').textContent = fmt(totalImp);
+  document.getElementById('imp-ctes').textContent  = comImp;
+  document.getElementById('imp-icms-pct').textContent  = totalReceita > 0 ? pct(totalICMS/totalReceita*100)+' da receita' : '';
+  document.getElementById('imp-iss-pct').textContent   = totalReceita > 0 ? pct(totalISS/totalReceita*100)+' da receita' : '';
+  document.getElementById('imp-total-pct').textContent = totalReceita > 0 ? pct(totalImp/totalReceita*100)+' da receita' : '';
+
+  // Gráfico composição
+  safeChart('chartImpComp', {
+    type:'doughnut',
+    data:{labels:['ICMS','ISS','Sem imposto'],datasets:[{data:[+totalICMS.toFixed(2),+totalISS.toFixed(2),+(totalReceita-totalImp).toFixed(2)],backgroundColor:['#D85A30','#854F0B','#e0dfd8'],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:10,padding:8}}}}
+  });
+
+  // Gráfico por UF
+  const porUF = {};
+  data.forEach(c => {
+    const k = c.uf_destino||'?';
+    if (!porUF[k]) porUF[k] = 0;
+    porUF[k] += (c.v_icms||0)+(c.v_iss||0);
+  });
+  const ufKeys = Object.keys(porUF).sort((a,b)=>porUF[b]-porUF[a]).slice(0,8);
+  safeChart('chartImpUF', {
+    type:'bar',
+    data:{labels:ufKeys,datasets:[{label:'Impostos',data:ufKeys.map(k=>+porUF[k].toFixed(2)),backgroundColor:'#D85A30',borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'R$'+Math.round(v/1000)+'k'},grid:{color:'rgba(0,0,0,0.05)'}},x:{grid:{display:false}}}}
+  });
+
+  // Tabela detalhada
+  document.getElementById('impTable').innerHTML = data.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text3)">Nenhum CTe encontrado</td></tr>'
+    : data.map(c => {
+        const icms = c.v_icms||0;
+        const iss  = c.v_iss||0;
+        const total = icms+iss;
+        const pIcms = (c.valor_frete||0)>0 ? icms/(c.valor_frete||1)*100 : 0;
+        const pIss  = (c.valor_frete||0)>0 ? iss/(c.valor_frete||1)*100  : 0;
+        return `<tr>
+          <td style="font-weight:700">${sanitize(c.numero_cte)}</td>
+          <td style="font-size:11px;color:var(--text2)">${sanitize(c.cnpj_emitente||'—')}</td>
+          <td style="font-size:11px">${sanitize(c.cidade_origem||'?')} → ${sanitize(c.cidade_destino||'?')}</td>
+          <td>${fmt(c.valor_frete||0)}</td>
+          <td style="color:var(--red)">${icms>0?fmt(icms):'—'}</td>
+          <td>${icms>0?pct(pIcms):'—'}</td>
+          <td style="color:var(--amber)">${iss>0?fmt(iss):'—'}</td>
+          <td>${iss>0?pct(pIss):'—'}</td>
+          <td style="font-weight:700;color:var(--red)">${total>0?fmt(total):'—'}</td>
+        </tr>`;
+      }).join('');
+}
+
+
+// ===== CONTAS A RECEBER =====
+let allPrazos = []; // prazos cadastrados por cliente
+
+async function loadPrazos() {
+  try {
+    const { data, error } = await sb.from('prazos_pagamento').select('*').eq('user_id', currentUser.id);
+    if (!error && data) allPrazos = data;
+  } catch(e) { console.warn('loadPrazos error:', e); }
+}
+
+function getPrazo(cnpj) {
+  return allPrazos.find(p => p.cnpj_cliente === cnpj) || null;
+}
+
+function calcVencimento(dataEmissao, prazoDias) {
+  if (!dataEmissao || !prazoDias) return null;
+  const d = new Date(dataEmissao + 'T00:00:00');
+  d.setDate(d.getDate() + prazoDias);
+  return d;
+}
+
+function diasRestantes(venc) {
+  if (!venc) return null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return Math.ceil((venc - hoje) / (1000*60*60*24));
+}
+
+function statusVencimento(dias) {
+  if (dias === null) return 'sem_prazo';
+  if (dias < 0)   return 'vencido';
+  if (dias <= 7)  return 'urgente';
+  if (dias <= 30) return 'proximo';
+  return 'ok';
+}
+
+function badgeStatus(dias) {
+  const s = statusVencimento(dias);
+  if (s === 'sem_prazo') return '<span class="badge" style="background:var(--bg2);color:var(--text2)">Sem prazo</span>';
+  if (s === 'vencido')   return `<span class="badge br">Vencido há ${Math.abs(dias)}d</span>`;
+  if (s === 'urgente')   return `<span class="badge ba">Urgente</span>`;
+  if (s === 'proximo')   return `<span class="badge bb">Em breve</span>`;
+  return `<span class="badge bg">Em dia</span>`;
+}
+
+function diasLabel(dias) {
+  if (dias === null) return '—';
+  if (dias < 0)  return `<span style="color:var(--red);font-weight:700">${Math.abs(dias)}d atraso</span>`;
+  if (dias === 0) return '<span style="color:var(--red);font-weight:700">Hoje</span>';
+  if (dias <= 7)  return `<span style="color:var(--amber);font-weight:700">${dias}d</span>`;
+  return `<span style="color:var(--green)">${dias}d</span>`;
+}
+
+async function renderContasReceber() {
+  try {
+    await loadPrazos();
+    renderPrazosTable();
+
+    const todos = allCTEs;
+    const statusFilt  = document.getElementById('crFiltStatus')?.value  || '';
+    const clienteFilt = document.getElementById('crFiltCliente')?.value || '';
+
+    // Popular filtro de clientes
+    const clienteSel = document.getElementById('crFiltCliente');
+    const clientes = {};
+    todos.forEach(c => {
+      if (c.cnpj_remetente) clientes[c.cnpj_remetente] = c.remetente || c.cnpj_remetente;
+      else if (c.remetente && c.remetente !== 'Não informado') clientes['__'+c.remetente] = c.remetente;
+    });
+    if (clienteSel) {
+      const current = clienteSel.value;
+      clienteSel.innerHTML = '<option value="">Todos os clientes</option>';
+      Object.entries(clientes).sort((a,b) => a[1].localeCompare(b[1])).forEach(([cnpj, nome]) => {
+        const o = document.createElement('option'); o.value = cnpj;
+        o.textContent = nome.substring(0,35) + (nome.length > 35 ? '...' : '');
+        clienteSel.appendChild(o);
+      });
+      if (current) clienteSel.value = current;
+    }
+
+    // Monta linhas
+    let rows = todos.map(c => {
+      const prazo = c.cnpj_remetente ? getPrazo(c.cnpj_remetente) : null;
+      const venc  = calcVencimento(c.data_emissao, prazo ? prazo.prazo_dias : null);
+      const dias  = diasRestantes(venc);
+      const st    = statusVencimento(dias);
+      return { c, prazo, venc, dias, st };
+    });
+
+    // Filtra por status
+    if (statusFilt)  rows = rows.filter(r => r.st === statusFilt);
+    // Filtra por cliente
+    if (clienteFilt) rows = rows.filter(r => r.c.cnpj_remetente === clienteFilt || ('__'+r.c.remetente) === clienteFilt);
+
+    // Ordena: vencidos primeiro, depois por dias crescente, sem prazo por último
+    rows.sort((a,b) => {
+      if (a.dias === null && b.dias === null) return 0;
+      if (a.dias === null) return 1;
+      if (b.dias === null) return -1;
+      return a.dias - b.dias;
+    });
+
+    // Métricas
+    const totalReceber = rows.reduce((s,r) => s+(r.c.valor_frete||0), 0);
+    const vence7   = rows.filter(r => r.dias !== null && r.dias >= 0 && r.dias <= 7).reduce((s,r) => s+(r.c.valor_frete||0), 0);
+    const vence30  = rows.filter(r => r.dias !== null && r.dias > 7  && r.dias <= 30).reduce((s,r) => s+(r.c.valor_frete||0), 0);
+    const vencidos = rows.filter(r => r.dias !== null && r.dias < 0).reduce((s,r) => s+(r.c.valor_frete||0), 0);
+    document.getElementById('cr-total').textContent    = fmt(totalReceber);
+    document.getElementById('cr-7dias').textContent    = fmt(vence7);
+    document.getElementById('cr-30dias').textContent   = fmt(vence30);
+    document.getElementById('cr-vencidos').textContent = fmt(vencidos);
+
+    // Tabela
+    document.getElementById('contasTable').innerHTML = rows.length === 0
+      ? '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text3)">Nenhum CTe encontrado. Importe CTe primeiro.</td></tr>'
+      : rows.map(function(r) {
+          var c = r.c;
+          var vencStr = r.venc ? r.venc.toLocaleDateString('pt-BR') : '-';
+          var prazoLabel = r.prazo ? (r.prazo.prazo_dias + 'd') : '<span style="color:var(--text3)">não config.</span>';
+          var cnpjRem  = c.cnpj_remetente   ? fmtCNPJ(c.cnpj_remetente)   : '-';
+          var cnpjDest = c.cnpj_destinatario ? fmtCNPJ(c.cnpj_destinatario) : '-';
+          var btnCnpj = (c.cnpj_remetente  || '').replace(/"/g, '');
+          var btnNome = (c.remetente || '').replace(/"/g, '');
+          var btn = '<button class="btn btn-sm" style="padding:2px 6px;font-size:10px" ';
+          btn += 'onclick="openPrazoModal(this)" ';
+          btn += 'data-cnpj="' + btnCnpj + '" data-nome="' + btnNome + '">✏️</button>';
+          return '<tr>' +
+            '<td style="font-weight:700">' + sanitize(c.numero_cte||'') + '</td>' +
+            '<td>' + (c.data_emissao||'-') + '</td>' +
+            '<td><div style="font-weight:500;font-size:12px">' + sanitize(c.remetente||'-') + '</div>' +
+            '<div style="font-size:10px;color:var(--text2)">' + cnpjRem + '</div></td>' +
+            '<td><div style="font-size:12px">' + sanitize(c.destinatario||'-') + '</div>' +
+            '<div style="font-size:10px;color:var(--text2)">' + cnpjDest + '</div></td>' +
+            '<td style="font-size:11px;color:var(--text2)">' + sanitize(c.cidade_origem||'?') + ' > ' + sanitize(c.cidade_destino||'?') + '</td>' +
+            '<td style="font-weight:700">' + fmt(c.valor_frete||0) + '</td>' +
+            '<td style="text-align:center">' + prazoLabel + ' ' + btn + '</td>' +
+            '<td>' + vencStr + '</td>' +
+            '<td>' + badgeStatus(r.dias) + '</td>' +
+            '<td>' + diasLabel(r.dias) + '</td>' +
+            '</tr>';
+        }).join('');
+
+  } catch(e) {
+    console.error('renderContasReceber error:', e);
+    const tb = document.getElementById('contasTable');
+    if (tb) tb.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--red)">Erro: ' + e.message + '</td></tr>';
+  }
+}
+
+function renderPrazosTable() {
+  // Coleta todos os tomadores únicos dos CTe
+  const clientes = {};
+  allCTEs.forEach(c => {
+    const key  = c.cnpj_remetente || ('__nome__' + c.remetente);
+    const nome = c.remetente && c.remetente !== 'Não informado' ? c.remetente : (c.cnpj_remetente || 'Sem nome');
+    if (key && !clientes[key]) clientes[key] = { cnpj: c.cnpj_remetente || '', nome };
+  });
+
+  const entradas = Object.values(clientes).sort((a,b) => a.nome.localeCompare(b.nome));
+
+  document.getElementById('prazosTable').innerHTML = entradas.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3)">Nenhum tomador encontrado. Importe CTe primeiro.</td></tr>'
+    : entradas.map(cl => {
+        const prazo = cl.cnpj ? getPrazo(cl.cnpj) : null;
+        const cnpjFmt = cl.cnpj ? fmtCNPJ(cl.cnpj) : '<span style="color:var(--text3)">Sem CNPJ</span>';
+        const canConfig = !!cl.cnpj;
+        var prazoBadge = prazo ? '<span class="badge bg">' + prazo.prazo_dias + ' dias</span>' : '<span class="badge ba">Não configurado</span>';
+        var prazoObs = sanitize(prazo ? (prazo.observacao||'—') : '—');
+        var btnHtml = canConfig
+          ? '<button class="btn btn-sm btn-primary" onclick="openPrazoModal(this)" data-cnpj="' + sanitize(cl.cnpj) + '" data-nome="' + sanitize(cl.nome) + '">' + (prazo ? '✏️ Editar' : '+ Configurar') + '</button>'
+          : '<span style="font-size:11px;color:var(--text3)">CNPJ necessário</span>';
+        return '<tr>' +
+          '<td style="font-weight:500">' + sanitize(cl.nome) + '</td>' +
+          '<td style="font-size:11px;color:var(--text2)">' + cnpjFmt + '</td>' +
+          '<td>' + prazoBadge + '</td>' +
+          '<td style="font-size:11px;color:var(--text2)">' + prazoObs + '</td>' +
+          '<td>' + btnHtml + '</td>' +
+          '</tr>';
+      }).join('');
+}
+
+function openPrazoModal(cnpjOrEl, nomeArg) {
+  var cnpj, nomeFinal;
+  if (cnpjOrEl && typeof cnpjOrEl === 'object' && cnpjOrEl.dataset) {
+    cnpj = cnpjOrEl.dataset.cnpj || '';
+    nomeFinal = cnpjOrEl.dataset.nome || cnpj;
+  } else {
+    cnpj = cnpjOrEl || '';
+    nomeFinal = nomeArg || cnpj;
+  }
+  if (!cnpj) return;
+  const prazo = getPrazo(cnpj);
+  document.getElementById('prazoClienteCNPJ').value        = cnpj;
+  document.getElementById('prazoClienteNome').value        = nomeFinal || cnpj;
+  document.getElementById('prazoClienteCNPJDisplay').value = fmtCNPJ(cnpj);
+  document.getElementById('prazoDias').value               = prazo?.prazo_dias || '';
+  document.getElementById('prazoObs').value                = prazo?.observacao || '';
+  document.getElementById('prazoModalMsg').innerHTML       = '';
+  const pm = document.getElementById('prazoModal'); pm.style.display = 'flex'; pm.style.alignItems = 'center'; pm.style.justifyContent = 'center';
+  setTimeout(() => document.getElementById('prazoDias').focus(), 100);
+}
+
+function closePrazoModal() {
+  document.getElementById('prazoModal').style.display = 'none';
+}
+
+async function salvarPrazo() {
+  const cnpj  = document.getElementById('prazoClienteCNPJ').value;
+  const nome  = document.getElementById('prazoClienteNome').value;
+  const dias  = parseInt(document.getElementById('prazoDias').value);
+  const obs   = document.getElementById('prazoObs').value.trim();
+  const msgEl = document.getElementById('prazoModalMsg');
+
+  if (!cnpj)          return msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">CNPJ inválido</div>';
+  if (!dias || dias < 1 || dias > 365)
+    return msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">Prazo deve ser entre 1 e 365 dias</div>';
+
+  setLoading('btnSalvarPrazo', true, 'Salvando...');
+  const { error } = await sb.from('prazos_pagamento').upsert({
+    user_id: currentUser.id,
+    cnpj_cliente: cnpj,
+    nome_cliente: sanitize(nome),
+    prazo_dias: dias,
+    observacao: sanitize(obs),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id,cnpj_cliente' });
+  setLoading('btnSalvarPrazo', false, '💾 Salvar prazo');
+
+  if (error) {
+    msgEl.innerHTML = `<div class="alert alert-error" style="margin-top:8px">${error.message}</div>`;
+  } else {
+    closePrazoModal();
+    await loadPrazos();
+    renderContasReceber();
+    toast('✅ Prazo salvo!');
+  }
+}
+
+async function exportContasCSV() {
+  var data = filterByPeriod(allCTEs);
+  var sep = ",";
+  var nl = "\r\n";
+  var q = function(v) { return '"' + String(v == null ? "" : v).split('"').join('""')+'"'; };
+  var hdr = [q("CTe"),q("Emissao"),q("Tomador"),q("CNPJ Tomador"),q("Cliente Final"),
+             q("CNPJ Dest"),q("Rota"),q("Valor"),q("Prazo dias"),q("Vencimento"),q("Status"),q("Dias")];
+  var out = hdr.join(sep) + nl;
+  var stLbl = {vencido:"Vencido",urgente:"Urgente",proximo:"Proximo",ok:"Em dia",sem_prazo:"Sem prazo"};
+  data.forEach(function(c) {
+    var prazo = getPrazo(c.cnpj_remetente);
+    var venc = calcVencimento(c.data_emissao, prazo ? prazo.prazo_dias : null);
+    var dias = diasRestantes(venc);
+    var st = statusVencimento(dias);
+    var row = [
+      q(c.numero_cte), q(c.data_emissao), q(c.remetente), q(c.cnpj_remetente),
+      q(c.destinatario), q(c.cnpj_destinatario),
+      q((c.cidade_origem||"?")+" - "+(c.cidade_destino||"?")),
+      q((c.valor_frete||0).toFixed(2)),
+      q(prazo ? prazo.prazo_dias : ""),
+      q(venc ? venc.toLocaleDateString("pt-BR") : ""),
+      q(stLbl[st] || st),
+      q(dias !== null ? dias : "")
+    ];
+    out += row.join(sep) + nl;
+  });
+  var blob = new Blob(["\uFEFF" + out], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = "contas_receber.csv"; a.click();
+  setTimeout(function(){URL.revokeObjectURL(url);}, 1000);
+  toast("CSV exportado com sucesso!");
+}
+
+
+// ===== CONTAS A PAGAR =====
+let allOcorrencias  = [];
+let allCustosVeiculo = [];
+
+async function loadContasPagar() {
+  try {
+    const [r1, r2] = await Promise.all([
+      sb.from('ocorrencias_cte').select('*').eq('user_id', currentUser.id).order('created_at', {ascending:false}),
+      sb.from('custos_veiculo').select('*').eq('user_id', currentUser.id).order('data_custo', {ascending:false})
+    ]);
+    if (!r1.error && r1.data) allOcorrencias   = r1.data;
+    if (!r2.error && r2.data) allCustosVeiculo = r2.data;
+  } catch(e) { console.warn('loadContasPagar error:', e); }
+}
+
+function getOcorrenciasCte(numeroCte) {
+  return allOcorrencias.filter(o => o.numero_cte === numeroCte);
+}
+
+function tipoLabel(tipo) {
+  const m = {
+    descarga:'Descarga',diaria:'Diária',pedagio_extra:'Pedágio',avaria:'Avaria',
+    estadia:'Estadia',outros:'Outros',
+    manutencao:'Manutenção',vistoria:'Vistoria',pneu:'Pneu',oleo:'Óleo',
+    seguro:'Seguro',ipva:'IPVA',lavagem:'Lavagem'
+  };
+  return m[tipo] || tipo;
+}
+
+async function renderContasPagar() {
+  await loadContasPagar();
+
+  const data = filterByPeriod(allCTEs);
+
+  // Popular filtro de mês
+  const meses = [...new Set(data.map(c => (c.data_emissao||'').substring(0,7)).filter(Boolean))].sort().reverse();
+  const mesSel = document.getElementById('cpFiltMes');
+  if (mesSel && mesSel.options.length <= 1) {
+    const nomeMes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    meses.forEach(m => {
+      const [y,mo] = m.split('-');
+      const o = document.createElement('option'); o.value = m;
+      o.textContent = nomeMes[+mo-1] + '/' + y.slice(2);
+      mesSel.appendChild(o);
+    });
+  }
+  const mesFiltro = mesSel ? mesSel.value : '';
+  const ctesFilt = mesFiltro ? data.filter(c => (c.data_emissao||'').startsWith(mesFiltro)) : data;
+
+  // Calcula totais
+  let totalViagem = 0, totalOcorr = 0;
+  ctesFilt.forEach(c => {
+    totalViagem += calcCusto(c);
+    totalOcorr  += getOcorrenciasCte(c.numero_cte).reduce((s,o) => s+(o.valor||0), 0);
+  });
+
+  const mesFiltroCV = mesFiltro || '';
+  const custVeic = mesFiltroCV
+    ? allCustosVeiculo.filter(v => v.mes_ref === mesFiltroCV)
+    : allCustosVeiculo;
+  const totalVeiculo = custVeic.reduce((s,v) => s+(v.valor||0), 0);
+  const totalGeral   = totalViagem + totalOcorr + totalVeiculo;
+
+  document.getElementById('cp-total').textContent   = fmt(totalGeral);
+  document.getElementById('cp-viagem').textContent  = fmt(totalViagem + totalOcorr);
+  document.getElementById('cp-veiculo').textContent = fmt(totalVeiculo);
+  document.getElementById('cp-ocorr').textContent   = allOcorrencias.filter(o =>
+    ctesFilt.some(c => c.numero_cte === o.numero_cte)).length + ' registros';
+
+  // Tabela viagens
+  const tbody = document.getElementById('cpViagemTable');
+  if (!ctesFilt.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--text3)">Nenhum CTe encontrado</td></tr>';
+  } else {
+    tbody.innerHTML = ctesFilt.map(c => {
+      const custo    = calcCusto(c);
+      const ocorrs   = getOcorrenciasCte(c.numero_cte);
+      const totOcorr = ocorrs.reduce((s,o) => s+(o.valor||0), 0);
+      const custoTotal = custo + totOcorr;
+      const resultado  = (c.valor_frete||0) - custoTotal - calcICMS(c).v;
+      const ocorrBadge = ocorrs.length > 0
+        ? '<span class="badge ba">' + ocorrs.length + ' ocorr. +' + fmt(totOcorr) + '</span>'
+        : '<span style="color:var(--text3);font-size:11px">nenhuma</span>';
+      const resBadge = resultado >= 0
+        ? '<span class="badge bg">' + fmt(resultado) + '</span>'
+        : '<span class="badge br">' + fmt(resultado) + '</span>';
+      const btnCte = (c.numero_cte||'').replace(/"/g,'');
+      return '<tr>' +
+        '<td style="font-weight:700">' + sanitize(c.numero_cte||'') + '</td>' +
+        '<td>' + (c.data_emissao||'—') + '</td>' +
+        '<td style="font-size:11px;color:var(--text2)">—</td>' +
+        '<td><span class="badge bb">' + sanitize(c.uf_origem||'?') + '</span></td>' +
+        '<td><span class="badge bb">' + sanitize(c.uf_destino||'?') + '</span></td>' +
+        '<td>' + fmt(c.valor_frete||0) + '</td>' +
+        '<td>' + fmt(custo) + '</td>' +
+        '<td>' + ocorrBadge + '</td>' +
+        '<td style="font-weight:700">' + fmt(custoTotal) + '</td>' +
+        '<td>' + resBadge + '</td>' +
+        '<td><button class="btn btn-sm" onclick="openOcorrModal(this)" data-cte="' + btnCte + '">📋 Ocorrências</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  // Tabela veículos
+  const tbodyV = document.getElementById('cpVeiculoTable');
+  if (!custVeic.length) {
+    tbodyV.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text3)">Nenhum custo registrado. Clique em "+ Registrar custo de veículo".</td></tr>';
+  } else {
+    tbodyV.innerHTML = custVeic.map(v => {
+      const d = v.data_custo ? new Date(v.data_custo+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+      return '<tr>' +
+        '<td style="font-weight:700">' + sanitize(v.placa||'') + '</td>' +
+        '<td><span class="badge bb">' + tipoLabel(v.tipo) + '</span></td>' +
+        '<td style="color:var(--text2)">' + sanitize(v.descricao||'—') + '</td>' +
+        '<td style="font-weight:700;color:var(--red)">' + fmt(v.valor||0) + '</td>' +
+        '<td>' + d + '</td>' +
+        '<td>' + sanitize(v.mes_ref||'—') + '</td>' +
+        '<td><button class="btn btn-sm btn-danger" onclick="deleteCustoVeiculo(this)" data-id="' + (v.id||'') + '">✕</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+}
+
+// ===== OCORRÊNCIAS =====
+function openOcorrModal(el) {
+  const cte = el ? (el.dataset.cte || '') : '';
+  document.getElementById('ocorrCteNum').value = cte;
+  document.getElementById('ocorrCteLabel').textContent = 'CTe ' + cte;
+  document.getElementById('ocorrValor').value = '';
+  document.getElementById('ocorrDesc').value  = '';
+  document.getElementById('ocorrData').value  = new Date().toISOString().split('T')[0];
+  document.getElementById('ocorrMsg').innerHTML = '';
+  renderOcorrLista(cte);
+  const m = document.getElementById('ocorrenciaModal');
+  m.style.display = 'flex'; m.style.alignItems = 'center'; m.style.justifyContent = 'center';
+}
+
+function closeOcorrModal() {
+  document.getElementById('ocorrenciaModal').style.display = 'none';
+  renderContasPagar();
+}
+
+function renderOcorrLista(cte) {
+  const ocorrs = getOcorrenciasCte(cte);
+  const el = document.getElementById('ocorrLista');
+  if (!ocorrs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:12px">Nenhuma ocorrência registrada</div>';
+    return;
+  }
+  const total = ocorrs.reduce((s,o) => s+(o.valor||0), 0);
+  el.innerHTML = '<div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text2)">OCORRÊNCIAS REGISTRADAS — Total: ' + fmt(total) + '</div>' +
+    ocorrs.map(o => {
+      const d = o.data_ocorrencia ? new Date(o.data_ocorrencia+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:var(--r);background:var(--bg2);margin-bottom:6px">' +
+        '<div>' +
+          '<span class="badge ba" style="margin-right:6px">' + tipoLabel(o.tipo) + '</span>' +
+          '<span style="font-size:12px">' + sanitize(o.descricao||'') + '</span>' +
+          '<span style="font-size:11px;color:var(--text2);margin-left:8px">' + d + '</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-weight:700;color:var(--red)">' + fmt(o.valor||0) + '</span>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteOcorrencia(this)" data-id="' + (o.id||'') + '" data-cte="' + (o.numero_cte||'').replace(/"/g,'') + '">✕</button>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+}
+
+async function salvarOcorrencia() {
+  const cte   = document.getElementById('ocorrCteNum').value;
+  const tipo  = document.getElementById('ocorrTipo').value;
+  const valor = parseFloat(document.getElementById('ocorrValor').value);
+  const desc  = document.getElementById('ocorrDesc').value.trim();
+  const data  = document.getElementById('ocorrData').value;
+  const msgEl = document.getElementById('ocorrMsg');
+
+  if (!cte)   return msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">CTe inválido</div>';
+  if (!valor || valor <= 0) return msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">Informe um valor válido</div>';
+
+  setLoading('btnSalvarOcorr', true, 'Salvando...');
+  const { error } = await sb.from('ocorrencias_cte').insert({
+    user_id: currentUser.id,
+    numero_cte: cte,
+    tipo, valor, descricao: sanitize(desc),
+    data_ocorrencia: data || null
+  });
+  setLoading('btnSalvarOcorr', false, '+ Adicionar ocorrência');
+
+  if (error) {
+    msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">' + error.message + '</div>';
+  } else {
+    await loadContasPagar();
+    renderOcorrLista(cte);
+    document.getElementById('ocorrValor').value = '';
+    document.getElementById('ocorrDesc').value  = '';
+    msgEl.innerHTML = '<div class="alert alert-success" style="margin-top:8px">✅ Ocorrência adicionada!</div>';
+    setTimeout(() => msgEl.innerHTML = '', 2000);
+    toast('Ocorrência registrada!');
+  }
+}
+
+async function deleteOcorrencia(elOrId, cteArg) {
+  var id  = (elOrId && typeof elOrId === 'object') ? elOrId.dataset.id  : elOrId;
+  var cte = (elOrId && typeof elOrId === 'object') ? elOrId.dataset.cte : cteArg;
+  if (!id) return;
+  if (!confirm('Remover esta ocorrência?')) return;
+  await sb.from('ocorrencias_cte').delete().eq('id', id).eq('user_id', currentUser.id);
+  await loadContasPagar();
+  renderOcorrLista(cte||'');
+  toast('Ocorrência removida');
+}
+
+// ===== CUSTOS VEÍCULO =====
+function openCustoVeiculoModal() {
+  document.getElementById('cvEditId').value = '';
+  document.getElementById('cvPlaca').value  = '';
+  document.getElementById('cvTipo').value   = 'manutencao';
+  document.getElementById('cvDesc').value   = '';
+  document.getElementById('cvValor').value  = '';
+  document.getElementById('cvData').value   = new Date().toISOString().split('T')[0];
+  document.getElementById('cvMesRef').value = new Date().toISOString().substring(0,7);
+  document.getElementById('cvMsg').innerHTML = '';
+  const m = document.getElementById('custoVeiculoModal');
+  m.style.display = 'flex'; m.style.alignItems = 'center'; m.style.justifyContent = 'center';
+  setTimeout(() => document.getElementById('cvPlaca').focus(), 100);
+}
+
+function closeCustoVeiculoModal() {
+  document.getElementById('custoVeiculoModal').style.display = 'none';
+}
+
+async function salvarCustoVeiculo() {
+  const placa  = document.getElementById('cvPlaca').value.trim().toUpperCase();
+  const tipo   = document.getElementById('cvTipo').value;
+  const desc   = document.getElementById('cvDesc').value.trim();
+  const valor  = parseFloat(document.getElementById('cvValor').value);
+  const data   = document.getElementById('cvData').value;
+  const mesRef = document.getElementById('cvMesRef').value;
+  const msgEl  = document.getElementById('cvMsg');
+
+  if (!placa)  return msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">Informe a placa</div>';
+  if (!valor || valor <= 0) return msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">Informe um valor válido</div>';
+  if (!data)   return msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">Informe a data</div>';
+
+  setLoading('btnSalvarCV', true, 'Salvando...');
+  const { error } = await sb.from('custos_veiculo').insert({
+    user_id: currentUser.id,
+    placa: sanitize(placa),
+    tipo, valor,
+    descricao: sanitize(desc),
+    data_custo: data,
+    mes_ref: mesRef || data.substring(0,7)
+  });
+  setLoading('btnSalvarCV', false, '💾 Salvar');
+
+  if (error) {
+    msgEl.innerHTML = '<div class="alert alert-error" style="margin-top:8px">' + error.message + '</div>';
+  } else {
+    closeCustoVeiculoModal();
+    await loadContasPagar();
+    renderContasPagar();
+    toast('✅ Custo de veículo registrado!');
+  }
+}
+
+async function deleteCustoVeiculo(elOrId) {
+  var id = (elOrId && typeof elOrId === 'object') ? elOrId.dataset.id : elOrId;
+  if (!id) return;
+  if (!confirm('Remover este custo?')) return;
+  await sb.from('custos_veiculo').delete().eq('id', id).eq('user_id', currentUser.id);
+  await loadContasPagar();
+  renderContasPagar();
+  toast('Custo removido');
+}
+
+
+init();
+</script>
+</body>
+</html>
